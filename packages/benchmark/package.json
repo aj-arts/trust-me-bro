@@ -1,0 +1,10 @@
+{
+  "name": "@trust-me-bro/benchmark",
+  "version": "0.3.0-local",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts"
+}

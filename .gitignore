@@ -10,6 +10,16 @@ node_modules/
 dist/
 build/
 coverage/
+.next/
+out/
+*.tsbuildinfo
+
+# Local benchmark archive
+**/.trust-me-bro/
+
+# Local browser verification artifacts
+.playwright-cli/
+output/playwright/
 
 # Logs
 *.log

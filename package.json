@@ -1,0 +1,17 @@
+{
+  "name": "trust-me-bro",
+  "version": "0.3.0-local",
+  "private": true,
+  "description": "Agent security benchmark for hidden-instruction and canary safety tests.",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck"
+  },
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
