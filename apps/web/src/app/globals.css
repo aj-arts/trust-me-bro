@@ -250,6 +250,61 @@ textarea {
     var(--surface-0);
 }
 
+.evidence-strip {
+  overflow: hidden;
+  border: 1px solid var(--border-muted);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, oklch(78% 0.135 188 / 0.055), transparent 38%),
+    linear-gradient(180deg, oklch(13.5% 0.026 248 / 0.98), oklch(8.5% 0.018 244 / 0.98)),
+    var(--surface-1);
+  box-shadow:
+    0 18px 54px var(--shadow),
+    inset 0 1px 0 oklch(88% 0.04 230 / 0.05);
+}
+
+.evidence-cell {
+  --evidence: var(--accent);
+  --evidence-bg: oklch(78% 0.135 188 / 0.14);
+  --evidence-border: oklch(78% 0.135 188 / 0.36);
+
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--evidence-border);
+  border-radius: 7px;
+  padding: 12px;
+  background:
+    linear-gradient(180deg, var(--evidence-bg), transparent 170%),
+    oklch(8% 0.018 244 / 0.92);
+  color: var(--evidence);
+}
+
+.evidence-cell-pass {
+  --evidence: var(--green);
+  --evidence-bg: var(--green-soft);
+  --evidence-border: oklch(74% 0.145 151 / 0.34);
+}
+
+.evidence-cell-warn {
+  --evidence: var(--amber);
+  --evidence-bg: var(--amber-soft);
+  --evidence-border: oklch(80% 0.155 79 / 0.36);
+}
+
+.evidence-cell-fail {
+  --evidence: var(--red);
+  --evidence-bg: var(--red-soft);
+  --evidence-border: oklch(68% 0.18 28 / 0.38);
+}
+
+.evidence-cell-info {
+  --evidence: var(--accent);
+  --evidence-bg: var(--accent-soft);
+  --evidence-border: var(--accent-border);
+}
+
 .icon-button {
   display: inline-flex;
   height: 32px;

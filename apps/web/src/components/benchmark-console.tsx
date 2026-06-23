@@ -81,6 +81,7 @@ const categoryOptions: ScenarioCategory[] = [
 ];
 
 const defaultModels = MODEL_PRESETS.slice(0, 5).map((model) => model.id);
+type EvidenceTone = "pass" | "warn" | "fail" | "info";
 
 export function BenchmarkConsole() {
   const [scenarios, setScenarios] =
@@ -184,7 +185,7 @@ export function BenchmarkConsole() {
   const scenarioResults = displayResults.filter(
     (result) => result.scenarioId === activeScenario.id,
   );
-  const dashboard = buildDashboard(displayResults, archive);
+  const dashboard = buildDashboard(run?.results ?? [], archive);
 
   async function loadArchive() {
     try {
@@ -653,34 +654,81 @@ function DashboardStrip({
 }: {
   dashboard: ReturnType<typeof buildDashboard>;
 }) {
+  const traceLabel =
+    dashboard.sampleSize === 1
+      ? "1 trace"
+      : `${dashboard.sampleSize} traces`;
+
   return (
-    <div className="grid gap-3 md:grid-cols-4">
-      <Metric icon={Gauge} label="Average Score" value={`${dashboard.averageScore}/100`} />
-      <Metric icon={CheckCircle2} label="Pass Rate" value={`${dashboard.passRate}%`} />
-      <Metric icon={ShieldAlert} label="Canary Trips" value={`${dashboard.canaryTrips}`} />
-      <Metric icon={Archive} label="Archived Runs" value={`${dashboard.archiveCount}`} />
-    </div>
+    <section className="evidence-strip">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--border-muted)] px-4 py-3">
+        <PanelTitle icon={Gauge} title="Evidence Snapshot" />
+        <div className="flex items-center gap-2 font-mono text-[11px] uppercase text-[color:var(--subtle)]">
+          <span className="size-1.5 rounded-full bg-[color:var(--accent)]" />
+          {dashboard.sourceLabel}
+        </div>
+      </div>
+      <div className="grid gap-2 p-2 md:grid-cols-4">
+        <EvidenceDatum
+          icon={Gauge}
+          label="Score Mean"
+          value={`${dashboard.averageScore}/100`}
+          detail={traceLabel}
+          tone={scoreTone(dashboard.averageScore)}
+        />
+        <EvidenceDatum
+          icon={CheckCircle2}
+          label="Pass Rate"
+          value={`${dashboard.passRate}%`}
+          detail="safe completions"
+          tone={scoreTone(dashboard.passRate)}
+        />
+        <EvidenceDatum
+          icon={ShieldAlert}
+          label="Canary Exposure"
+          value={`${dashboard.canaryTrips}`}
+          detail={dashboard.canaryTrips ? "tripped evidence" : "no trips"}
+          tone={dashboard.canaryTrips ? "fail" : "pass"}
+        />
+        <EvidenceDatum
+          icon={Archive}
+          label="Archive Depth"
+          value={`${dashboard.archiveCount}`}
+          detail="saved runs"
+          tone="info"
+        />
+      </div>
+    </section>
   );
 }
 
-function Metric({
+function EvidenceDatum({
   icon: Icon,
   label,
   value,
+  detail,
+  tone,
 }: {
   icon: typeof Gauge;
   label: string;
   value: string;
+  detail: string;
+  tone: EvidenceTone;
 }) {
   return (
-    <div className="panel flex min-h-[86px] items-center gap-3 p-3">
-      <div className="flex size-10 items-center justify-center rounded-md border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyan-200">
+    <div className={classNames("evidence-cell", evidenceToneClass(tone))}>
+      <div className="flex size-9 items-center justify-center rounded-md border border-current/25 bg-current/10">
         <Icon size={17} />
       </div>
       <div className="min-w-0">
-        <div className="text-xs text-[color:var(--subtle)]">{label}</div>
-        <div className="font-mono text-lg font-semibold text-[color:var(--foreground)]">
+        <div className="font-mono text-[11px] uppercase text-[color:var(--subtle)]">
+          {label}
+        </div>
+        <div className="mt-1 font-mono text-base font-semibold text-[color:var(--foreground)]">
           {value}
+        </div>
+        <div className="mt-0.5 truncate text-xs text-[color:var(--muted)]">
+          {detail}
         </div>
       </div>
     </div>
@@ -1297,6 +1345,12 @@ function buildDashboard(
     passRate,
     canaryTrips,
     archiveCount: archive.length,
+    sampleSize: source.length,
+    sourceLabel: results.length
+      ? "live evidence"
+      : archive[0]
+        ? "latest archive"
+        : "preview state",
   };
 }
 
@@ -1327,6 +1381,19 @@ function severityClass(severity?: string) {
   if (severity === "medium") return "text-amber-300";
   if (severity === "low") return "text-emerald-300";
   return "text-[color:var(--subtle)]";
+}
+
+function scoreTone(value: number): EvidenceTone {
+  if (value >= 80) return "pass";
+  if (value >= 55) return "warn";
+  return "fail";
+}
+
+function evidenceToneClass(tone: EvidenceTone) {
+  if (tone === "pass") return "evidence-cell-pass";
+  if (tone === "warn") return "evidence-cell-warn";
+  if (tone === "fail") return "evidence-cell-fail";
+  return "evidence-cell-info";
 }
 
 function statusTextClass(status: EvaluationResult) {
