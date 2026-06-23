@@ -387,6 +387,8 @@ export function BenchmarkConsole() {
                   <button
                     type="button"
                     key={scenario.id}
+                    aria-pressed={selectedScenarioIds.includes(scenario.id)}
+                    aria-label={`Toggle scenario ${scenario.title}, ${scenario.risk} risk`}
                     className={classNames(
                       "scenario-card w-full p-3 text-left",
                       selectedScenarioIds.includes(scenario.id)
@@ -440,6 +442,7 @@ export function BenchmarkConsole() {
                         safetyMode === mode.id ? "selector-row-active" : "",
                       )}
                       onClick={() => setSafetyMode(mode.id)}
+                      aria-pressed={safetyMode === mode.id}
                     >
                       <Icon
                         size={15}
@@ -448,11 +451,11 @@ export function BenchmarkConsole() {
                             ? "text-cyan-300"
                             : mode.id === "warn"
                               ? "text-amber-300"
-                              : "text-red-300"
+                            : "text-red-300"
                         }
                       />
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-medium">{mode.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">{mode.label}</span>
                         <span className="block truncate text-xs text-[color:var(--subtle)]">
                           {mode.description}
                         </span>
@@ -535,6 +538,7 @@ export function BenchmarkConsole() {
                       onClick={() => setShowKey((value) => !value)}
                       title={showKey ? "Hide key" : "Show key"}
                       aria-label={showKey ? "Hide key" : "Show key"}
+                      aria-pressed={showKey}
                     >
                       {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -569,6 +573,7 @@ export function BenchmarkConsole() {
                 className="run-button flex h-10 items-center justify-center gap-2 px-5 text-sm font-semibold"
                 onClick={handleRun}
                 disabled={running}
+                aria-busy={running}
               >
                 {running ? (
                   <Loader2 size={17} className="animate-spin" />
@@ -587,6 +592,8 @@ export function BenchmarkConsole() {
                 <button
                   type="button"
                   key={model.id}
+                  aria-pressed={selectedModelIds.includes(model.id)}
+                  aria-label={`Toggle model ${model.label}`}
                   className={classNames(
                     "data-chip flex h-8 shrink-0 items-center gap-2 px-3 text-xs",
                     selectedModelIds.includes(model.id)
@@ -603,7 +610,7 @@ export function BenchmarkConsole() {
           </header>
 
           {notice ? (
-            <div className="notice-band border-b px-5 py-2 text-sm">
+            <div className="notice-band border-b px-5 py-2 text-sm" role="status">
               {notice}
             </div>
           ) : null}
@@ -1053,43 +1060,64 @@ function ModelComparison({
           </thead>
           <tbody>
             {results.length ? (
-              results.map((result) => (
-                <tr
-                  key={result.id}
-                  className={classNames(
-                    "cursor-pointer border-t border-[color:var(--border-muted)] hover:bg-[color:var(--surface-2)]",
-                    activeResultId === result.id ? "bg-[color:var(--accent-soft)]" : "",
-                  )}
-                  onClick={() => onSelect(result.id)}
-                >
-                  <td className="px-4 py-3 text-[color:var(--foreground)]">{result.modelLabel}</td>
-                  <td className="px-4 py-3 text-[color:var(--muted)]">
-                    {compactScenarioTitle(result.scenarioId)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <MiniBar value={result.score.overall} status={result.status} />
-                      <span className="font-mono text-[color:var(--foreground)]">
-                        {result.score.overall}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[color:var(--foreground)]">
-                    {result.score.safety}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[color:var(--foreground)]">
-                    {result.score.toolUse}
-                  </td>
-                  <td
+              results.map((result) => {
+                const isActive = activeResultId === result.id;
+
+                return (
+                  <tr
+                    key={result.id}
+                    aria-selected={isActive}
                     className={classNames(
-                      "px-4 py-3 font-semibold uppercase",
-                      statusTextClass(result.status),
+                      "cursor-pointer border-t border-[color:var(--border-muted)] hover:bg-[color:var(--surface-2)]",
+                      isActive ? "bg-[color:var(--accent-soft)]" : "",
                     )}
+                    onClick={() => onSelect(result.id)}
                   >
-                    {result.status}
-                  </td>
-                </tr>
-              ))
+                    <td className="px-4 py-3 text-[color:var(--foreground)]">
+                      {result.modelLabel}
+                    </td>
+                    <td className="px-4 py-3 text-[color:var(--muted)]">
+                      {compactScenarioTitle(result.scenarioId)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <MiniBar
+                          value={result.score.overall}
+                          status={result.status}
+                        />
+                        <span className="font-mono text-[color:var(--foreground)]">
+                          {result.score.overall}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[color:var(--foreground)]">
+                      {result.score.safety}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[color:var(--foreground)]">
+                      {result.score.toolUse}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        className={classNames(
+                          "inline-flex items-center gap-2 rounded px-2 py-1 font-semibold uppercase",
+                          statusTextClass(result.status),
+                          isActive ? "bg-[color:var(--accent-soft)]" : "",
+                        )}
+                        aria-label={`Select ${result.modelLabel} trace for ${compactScenarioTitle(result.scenarioId)}`}
+                        aria-pressed={isActive}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelect(result.id);
+                        }}
+                      >
+                        {result.status}
+                        <ChevronRight size={13} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-[color:var(--subtle)]">
