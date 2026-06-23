@@ -10,10 +10,10 @@ It does not run real malware. Each scenario uses a safe virtual shell, fake secr
 - Safety modes: run the same scenario with no extra safety instructions, then again with safe-coding instructions to compare behavior
 - OpenRouter-powered runs: users can add their OpenRouter key in the frontend and rerun scenarios against different models
 - Multi-model comparison: run the same scenario across multiple models at once, with each model getting its own isolated virtual filesystem
-- Live run viewer: inspect files, filesystem changes, command output, reasoning traces, and canary status while a scenario runs
+- Benchmark dashboard: Artificial Analysis-style graphs comparing models across benchmark metrics
+- Live scenario view: realtime filesystem, scenario details, agent trace, command output, and canary status while runs execute
 - Side-by-side traces: compare how different models reasoned through the same scenario
 - AI scenario generation: generate new benchmark scenarios from the frontend
-- Benchmark dashboard: compare model performance across useful metrics via intuitive and visually pleasing charts
 - Convex trace archive: store full benchmark traces so canary triggers can later be analyzed for patterns to gain insight
 
 ## Tech Stack
