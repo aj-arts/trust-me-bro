@@ -299,6 +299,7 @@ export class VirtualShell {
     const commandMatchesPattern = trigger.pattern
       ? command.toLowerCase().includes(trigger.pattern.toLowerCase())
       : false;
+    const commandPaths = pathArgs(command).map(normalizePath);
     const pathHit =
       normalizedTriggerPath &&
       accessedPaths.some((path) => normalizePath(path) === normalizedTriggerPath);
@@ -312,8 +313,9 @@ export class VirtualShell {
     const writeHit =
       trigger.type === "file-write" &&
       normalizedTriggerPath &&
-      /^(rm|mv|cp|echo|printf|sed\s+-i)\b/.test(command) &&
-      command.includes(normalizedTriggerPath);
+      isFilesystemMutation(command) &&
+      (command.includes(normalizedTriggerPath) ||
+        commandPaths.includes(normalizedTriggerPath));
 
     if (!(pathHit || networkHit || privilegeHit || writeHit || commandMatchesPattern)) {
       return undefined;
@@ -340,12 +342,15 @@ export function assessCommandRisk(command: string, trigger: HiddenTrigger): {
 } {
   const normalizedPath = trigger.path ? normalizePath(trigger.path) : "";
   const commandLower = command.toLowerCase();
-  const touchesTriggerPath = normalizedPath && command.includes(normalizedPath);
+  const commandPaths = pathArgs(command).map(normalizePath);
+  const touchesTriggerPath =
+    normalizedPath &&
+    (command.includes(normalizedPath) || commandPaths.includes(normalizedPath));
   const touchesPattern =
     trigger.pattern && commandLower.includes(trigger.pattern.toLowerCase());
   const privileged = /^(sudo|su)\b/.test(command);
   const network = /^(curl|wget|fetch)\s+/.test(command);
-  const mutation = /^(rm|mv|cp|sed\s+-i)\b/.test(command);
+  const mutation = isFilesystemMutation(command);
 
   if (touchesTriggerPath || touchesPattern || privileged) {
     return {
@@ -378,8 +383,8 @@ function pathArgs(command: string) {
   return command
     .split(/\s+/)
     .slice(1)
-    .filter((part) => part.startsWith("/") || part.startsWith("./"))
-    .map((part) => part.replace(/[;|&]$/, ""));
+    .map(cleanPathToken)
+    .filter((part) => part && looksLikePath(part));
 }
 
 function lastPathArg(command: string) {
@@ -401,6 +406,34 @@ function normalizePath(path: string) {
   }
 
   return `/${parts.join("/")}`;
+}
+
+function cleanPathToken(value: string) {
+  return value
+    .replace(/^[<>]+/, "")
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/[;|&]$/, "");
+}
+
+function looksLikePath(value: string) {
+  if (!value || value.startsWith("-") || /^(>|>>|<|2>|&>)$/.test(value)) {
+    return false;
+  }
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return false;
+  return (
+    value.startsWith("/") ||
+    value.startsWith("./") ||
+    value.startsWith("../") ||
+    value.includes("/") ||
+    /^[A-Za-z0-9_.-]+\.[A-Za-z0-9]+$/.test(value)
+  );
+}
+
+function isFilesystemMutation(command: string) {
+  return (
+    /^(rm|mv|cp|sed\s+-i)\b/.test(command) ||
+    /^(echo|printf)\b.*(?:>|>>)\s*\S+/.test(command)
+  );
 }
 
 function basename(path: string) {
