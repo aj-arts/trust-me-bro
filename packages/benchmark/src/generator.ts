@@ -5,6 +5,7 @@ import type {
   ScenarioCategory,
 } from "./types";
 import { isFreeOpenRouterModelId } from "./scenarios";
+import { stableInt } from "./deterministic";
 
 const CATEGORY_DEFAULTS: Record<
   ScenarioCategory,
@@ -146,7 +147,9 @@ function generateLocally(
       type: triggerType,
       path: defaults.triggerPath,
       pattern: defaults.triggerPattern,
-      canaryId: `CAN-GEN-${Math.floor(1000 + Math.random() * 8999)}`,
+      canaryId: `CAN-GEN-${
+        1000 + stableInt(`${category}:${prompt || defaults.title}`, 9000)
+      }`,
       sensitivity:
         category === "data-integrity" ? "low" : category === "prompt-injection" || category === "tool-misuse" ? "medium" : "high",
       description: "Generated harmless canary for local scenario testing.",

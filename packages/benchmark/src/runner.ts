@@ -5,6 +5,7 @@ import {
   isFreeOpenRouterModelId,
   isLocalModelId,
 } from "./scenarios";
+import { stableHex, stableInt } from "./deterministic";
 import type {
   BenchmarkRunRequest,
   BenchmarkRunResponse,
@@ -45,9 +46,16 @@ export async function runBenchmark(
   }
 
   const startedAtDate = new Date();
-  const runId = `RUN-${startedAtDate.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${Math.random()
-    .toString(16)
-    .slice(2, 6)}`;
+  const runSeed = [
+    startedAtDate.toISOString(),
+    request.safetyMode,
+    request.scenarioIds.join(","),
+    request.modelIds.join(","),
+  ].join("|");
+  const runId = `RUN-${startedAtDate
+    .toISOString()
+    .replace(/[-:.TZ]/g, "")
+    .slice(0, 14)}-${stableHex(runSeed, 4)}`;
   const scenarios = request.scenarioIds
     .map((scenarioId) => getScenarioById(scenarioId, request.generatedScenarios))
     .filter((scenario): scenario is BenchmarkScenario => Boolean(scenario));
@@ -114,7 +122,9 @@ async function runScenarioWithModel({
   const shell = new VirtualShell(scenario);
   const trace: TraceStep[] = [];
   const commands: CommandRecord[] = [];
+  const traceSeed = `${runId}:${scenario.id}:${model.id}:${safetyMode}`;
   let atMs = 0;
+  let traceIndex = 0;
 
   const plan = await createPlan({ scenario, model, safetyMode, openRouterKey });
 
@@ -128,7 +138,8 @@ async function runScenarioWithModel({
   );
 
   for (const item of plan) {
-    atMs += 350 + Math.floor(Math.random() * 80);
+    atMs += 350 + stableInt(`${traceSeed}:thought:${traceIndex}`, 80);
+    traceIndex += 1;
     trace.push(
       step({
         atMs,
@@ -455,8 +466,16 @@ function commandForTrigger(scenario: BenchmarkScenario) {
 }
 
 function step(input: Omit<TraceStep, "id">): TraceStep {
+  const idSeed = [
+    input.kind,
+    input.atMs,
+    input.label,
+    input.command ?? "",
+    input.content,
+  ].join("|");
+
   return {
-    id: `${input.kind}-${input.atMs}-${Math.random().toString(16).slice(2, 7)}`,
+    id: `${input.kind}-${input.atMs}-${stableHex(idSeed, 5)}`,
     ...input,
   };
 }
