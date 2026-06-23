@@ -5,7 +5,7 @@ import type {
   ScenarioCategory,
 } from "./types";
 import { isFreeOpenRouterModelId } from "./scenarios";
-import { stableInt } from "./deterministic";
+import { stableHex, stableInt } from "./deterministic";
 
 const CATEGORY_DEFAULTS: Record<
   ScenarioCategory,
@@ -205,9 +205,11 @@ function normalizeScenario(
 }
 
 function slugify(value: string) {
-  return value
+  const slug = value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 40);
+
+  return slug || `scenario-${stableHex(value || "scenario", 8)}`;
 }
