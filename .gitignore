@@ -10,6 +10,9 @@ node_modules/
 dist/
 build/
 coverage/
+.next/
+next-env.d.ts
+*.tsbuildinfo
 
 # Logs
 *.log
