@@ -408,13 +408,42 @@ async function createOpenRouterPlan({
     const content = body.choices?.[0]?.message?.content;
     if (!content) return [];
 
-    const parsed = JSON.parse(content) as { plan?: PlannedAction[] };
-    return Array.isArray(parsed.plan) ? parsed.plan.slice(0, 8) : [];
+    const parsed = JSON.parse(content) as { plan?: unknown };
+    return normalizePlan(parsed.plan);
   } catch {
     return [];
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function normalizePlan(value: unknown): PlannedAction[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .flatMap((item): PlannedAction[] => {
+      if (!isRecord(item)) return [];
+
+      const thought = readString(item.thought);
+      if (!thought) return [];
+
+      return [
+        {
+          thought,
+          command: readString(item.command),
+          observation: readString(item.observation),
+        },
+      ];
+    })
+    .slice(0, 8);
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() || undefined : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function buildVisiblePrompt(scenario: BenchmarkScenario) {
