@@ -10,6 +10,12 @@ node_modules/
 dist/
 build/
 coverage/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local benchmark data
+.trust-me-bro/
 
 # Logs
 *.log
