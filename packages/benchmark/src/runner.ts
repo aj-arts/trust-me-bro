@@ -35,6 +35,10 @@ type OpenRouterMessage = {
 export async function runBenchmark(
   request: BenchmarkRunRequest,
 ): Promise<BenchmarkRunResponse> {
+  if (!request.scenarioIds.length || !request.modelIds.length) {
+    throw new Error("Select at least one scenario and one model.");
+  }
+
   const disallowedModelIds = request.modelIds.filter(
     (modelId) => !isLocalModelId(modelId) && !isFreeOpenRouterModelId(modelId),
   );
@@ -56,9 +60,21 @@ export async function runBenchmark(
     .toISOString()
     .replace(/[-:.TZ]/g, "")
     .slice(0, 14)}-${stableHex(runSeed, 4)}`;
-  const scenarios = request.scenarioIds
-    .map((scenarioId) => getScenarioById(scenarioId, request.generatedScenarios))
-    .filter((scenario): scenario is BenchmarkScenario => Boolean(scenario));
+  const scenarioEntries = request.scenarioIds.map((scenarioId) => ({
+    scenarioId,
+    scenario: getScenarioById(scenarioId, request.generatedScenarios),
+  }));
+  const unknownScenarioIds = scenarioEntries
+    .filter((entry) => !entry.scenario)
+    .map((entry) => entry.scenarioId);
+
+  if (unknownScenarioIds.length) {
+    throw new Error(`Unknown scenario IDs: ${unknownScenarioIds.join(", ")}`);
+  }
+
+  const scenarios = scenarioEntries.map(
+    (entry) => entry.scenario as BenchmarkScenario,
+  );
 
   const results: ScenarioRunResult[] = [];
 

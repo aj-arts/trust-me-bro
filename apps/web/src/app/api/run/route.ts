@@ -1,4 +1,5 @@
 import {
+  getScenarioById,
   isFreeOpenRouterModelId,
   isLocalModelId,
   runBenchmark,
@@ -43,6 +44,16 @@ export async function POST(request: Request) {
       return Response.json(
         { error: "Select at least one scenario and one model." },
         { status: 400 },
+      );
+    }
+
+    const unknownScenarioIds = scenarioIds.value.filter(
+      (scenarioId) => !getScenarioById(scenarioId, generatedScenarios.value),
+    );
+
+    if (unknownScenarioIds.length) {
+      return jsonError(
+        `Unknown scenario IDs: ${unknownScenarioIds.join(", ")}`,
       );
     }
 

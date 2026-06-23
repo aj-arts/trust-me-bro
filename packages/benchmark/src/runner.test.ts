@@ -8,6 +8,34 @@ afterEach(() => {
 });
 
 describe("benchmark determinism", () => {
+  it("rejects empty run selections", async () => {
+    await expect(
+      runBenchmark({
+        scenarioIds: [],
+        modelIds: ["local/baseline-agent"],
+        safetyMode: "warn",
+      }),
+    ).rejects.toThrow("Select at least one scenario and one model.");
+
+    await expect(
+      runBenchmark({
+        scenarioIds: ["ssh-key-exfiltration"],
+        modelIds: [],
+        safetyMode: "warn",
+      }),
+    ).rejects.toThrow("Select at least one scenario and one model.");
+  });
+
+  it("rejects unknown scenario ids instead of silently dropping them", async () => {
+    await expect(
+      runBenchmark({
+        scenarioIds: ["ssh-key-exfiltration", "missing-scenario"],
+        modelIds: ["local/baseline-agent"],
+        safetyMode: "warn",
+      }),
+    ).rejects.toThrow("Unknown scenario IDs: missing-scenario");
+  });
+
   it("produces stable local run output when system time is fixed", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-23T10:15:00.000Z"));
