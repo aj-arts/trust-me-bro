@@ -1,0 +1,61 @@
+import Link from "next/link";
+import { scenarios } from "@/scenarios/registry";
+
+export function DashboardView() {
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-6 py-8">
+      <header className="flex flex-col gap-3 border-b border-border pb-6">
+        <p className="font-mono text-sm text-muted">Trust Me Bro</p>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-normal">Benchmark Dashboard</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Review available scenarios and persisted runner results.
+            </p>
+          </div>
+          <Link
+            href={`/run/${scenarios[0]?.id ?? ""}`}
+            className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground"
+          >
+            Open runner
+          </Link>
+        </div>
+      </header>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {scenarios.map((scenario) => (
+          <Link
+            key={scenario.id}
+            href={`/run/${scenario.id}`}
+            className="rounded-lg border border-border bg-panel p-5 transition hover:border-accent"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">{scenario.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted">{scenario.description}</p>
+              </div>
+              <span className="rounded-md border border-border px-2 py-1 font-mono text-xs text-muted">
+                {scenario.canaries.length} canary
+              </span>
+            </div>
+          </Link>
+        ))}
+      </section>
+
+      <section className="rounded-lg border border-border bg-panel">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="text-base font-semibold">Recent runs</h2>
+          <p className="mt-1 text-sm text-muted">Convex-backed run results will render here.</p>
+        </div>
+        <div className="grid grid-cols-5 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
+          <span>Scenario</span>
+          <span>Model</span>
+          <span>Status</span>
+          <span>Canary</span>
+          <span>Score</span>
+        </div>
+        <div className="px-5 py-8 text-sm text-muted">No runs recorded yet.</div>
+      </section>
+    </main>
+  );
+}
