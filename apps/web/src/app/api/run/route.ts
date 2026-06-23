@@ -2,8 +2,15 @@ import {
   isFreeOpenRouterModelId,
   isLocalModelId,
   runBenchmark,
-  type BenchmarkRunRequest,
 } from "@trust-me-bro/benchmark";
+import {
+  jsonError,
+  readGeneratedScenarios,
+  readJsonObject,
+  readOptionalString,
+  readSafetyMode,
+  readStringArray,
+} from "@/server/api-validation";
 import { appendArchive } from "@/server/archive";
 
 export const runtime = "nodejs";
@@ -11,18 +18,35 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Partial<BenchmarkRunRequest>;
-    const scenarioIds = Array.isArray(body.scenarioIds) ? body.scenarioIds : [];
-    const modelIds = Array.isArray(body.modelIds) ? body.modelIds : [];
+    const parsed = await readJsonObject(request);
+    if ("response" in parsed) return parsed.response;
 
-    if (!scenarioIds.length || !modelIds.length) {
+    const { body } = parsed;
+    const scenarioIds = readStringArray(body, "scenarioIds");
+    if ("response" in scenarioIds) return scenarioIds.response;
+
+    const modelIds = readStringArray(body, "modelIds");
+    if ("response" in modelIds) return modelIds.response;
+
+    const safetyMode = readSafetyMode(body);
+    if ("response" in safetyMode) return safetyMode.response;
+
+    const generatedScenarios = readGeneratedScenarios(body);
+    if ("response" in generatedScenarios) return generatedScenarios.response;
+
+    const openRouterKey = readOptionalString(body, "openRouterKey");
+    if (openRouterKey === null) {
+      return jsonError("openRouterKey must be a string.");
+    }
+
+    if (!scenarioIds.value.length || !modelIds.value.length) {
       return Response.json(
         { error: "Select at least one scenario and one model." },
         { status: 400 },
       );
     }
 
-    const paidModelIds = modelIds.filter(
+    const paidModelIds = modelIds.value.filter(
       (modelId) => !isLocalModelId(modelId) && !isFreeOpenRouterModelId(modelId),
     );
 
@@ -36,11 +60,11 @@ export async function POST(request: Request) {
     }
 
     const result = await runBenchmark({
-      scenarioIds,
-      modelIds,
-      safetyMode: body.safetyMode ?? "warn",
-      openRouterKey: body.openRouterKey,
-      generatedScenarios: body.generatedScenarios ?? [],
+      scenarioIds: scenarioIds.value,
+      modelIds: modelIds.value,
+      safetyMode: safetyMode.value,
+      openRouterKey,
+      generatedScenarios: generatedScenarios.value,
     });
 
     await appendArchive(result.archiveEntry);
