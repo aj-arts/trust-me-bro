@@ -23,3 +23,25 @@ It does not run real malware. Each scenario uses a safe virtual shell, fake secr
 - PI SDK for agent runs
 - just-bash for the virtual shell and filesystem
 - OpenRouter for model inference
+
+## Development
+
+Install dependencies:
+
+```bash
+pnpm install
+```
+
+Run the Next.js app:
+
+```bash
+pnpm dev
+```
+
+Run Convex in another terminal after configuring a Convex project:
+
+```bash
+pnpm dev:convex
+```
+
+User OpenRouter keys are entered in the browser runner UI. They should not be stored in Convex or committed env files.
