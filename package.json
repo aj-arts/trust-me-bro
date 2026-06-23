@@ -8,6 +8,7 @@
     "build": "pnpm --filter web build",
     "start": "pnpm --filter web start",
     "lint": "pnpm --filter web lint",
+    "test": "pnpm --filter @trust-me-bro/benchmark test",
     "typecheck": "pnpm --filter web typecheck"
   },
   "packageManager": "pnpm@10.22.0",
