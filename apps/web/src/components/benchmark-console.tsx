@@ -187,9 +187,22 @@ export function BenchmarkConsole() {
   const dashboard = buildDashboard(displayResults, archive);
 
   async function loadArchive() {
-    const response = await fetch("/api/archive", { cache: "no-store" });
-    const body = (await response.json()) as { archive: TraceArchiveEntry[] };
-    setArchive(body.archive);
+    try {
+      const response = await fetch("/api/archive", { cache: "no-store" });
+
+      if (!response.ok) {
+        const body = await readJsonBody<{ error?: string }>(response, {});
+        throw new Error(body.error ?? "Archive load failed.");
+      }
+
+      const body = await readJsonBody<{ archive?: TraceArchiveEntry[] }>(
+        response,
+        {},
+      );
+      setArchive(Array.isArray(body.archive) ? body.archive : []);
+    } catch (error) {
+      setNotice(messageFromError(error, "Archive load failed."));
+    }
   }
 
   async function handleRun() {
@@ -212,19 +225,27 @@ export function BenchmarkConsole() {
       });
 
       if (!response.ok) {
-        const body = (await response.json()) as { error?: string };
+        const body = await readJsonBody<{ error?: string }>(response, {});
         throw new Error(body.error ?? "Run failed.");
       }
 
-      const body = (await response.json()) as BenchmarkRunResponse;
-      setRun(body);
-      setActiveResultId(body.results[0]?.id);
+      const body = await readJsonBody<Partial<BenchmarkRunResponse>>(
+        response,
+        {},
+      );
+      if (!Array.isArray(body.results) || !body.runId || !body.startedAt) {
+        throw new Error("Run response was malformed.");
+      }
+
+      const completedRun = body as BenchmarkRunResponse;
+      setRun(completedRun);
+      setActiveResultId(completedRun.results[0]?.id);
       await loadArchive();
       setNotice(
-        `Completed ${body.results.length} model/scenario run${body.results.length === 1 ? "" : "s"}.`,
+        `Completed ${completedRun.results.length} model/scenario run${completedRun.results.length === 1 ? "" : "s"}.`,
       );
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Run failed.");
+      setNotice(messageFromError(error, "Run failed."));
     } finally {
       setRunning(false);
     }
@@ -247,32 +268,48 @@ export function BenchmarkConsole() {
       });
 
       if (!response.ok) {
-        const body = (await response.json()) as { error?: string };
+        const body = await readJsonBody<{ error?: string }>(response, {});
         throw new Error(body.error ?? "Scenario generation failed.");
       }
 
-      const body = (await response.json()) as GeneratedScenarioResponse;
+      const body = await readJsonBody<Partial<GeneratedScenarioResponse>>(
+        response,
+        {},
+      );
+      if (!body.scenario?.id || !body.scenario.title || !body.source) {
+        throw new Error("Scenario generation response was malformed.");
+      }
+
+      const generated = body as GeneratedScenarioResponse;
       setScenarios((current) => [
-        body.scenario,
-        ...current.filter((scenario) => scenario.id !== body.scenario.id),
+        generated.scenario,
+        ...current.filter((scenario) => scenario.id !== generated.scenario.id),
       ]);
-      setSelectedScenarioIds([body.scenario.id]);
+      setSelectedScenarioIds([generated.scenario.id]);
       setNotice(
-        `Added ${body.scenario.title} from ${body.source === "openrouter" ? "OpenRouter" : "local generator"}.`,
+        `Added ${generated.scenario.title} from ${generated.source === "openrouter" ? "OpenRouter" : "local generator"}.`,
       );
     } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Scenario generation failed.",
-      );
+      setNotice(messageFromError(error, "Scenario generation failed."));
     } finally {
       setGenerating(false);
     }
   }
 
   async function handleClearArchive() {
-    await fetch("/api/archive", { method: "DELETE" });
-    setArchive([]);
-    setNotice("Trace archive cleared.");
+    try {
+      const response = await fetch("/api/archive", { method: "DELETE" });
+
+      if (!response.ok) {
+        const body = await readJsonBody<{ error?: string }>(response, {});
+        throw new Error(body.error ?? "Archive clear failed.");
+      }
+
+      setArchive([]);
+      setNotice("Trace archive cleared.");
+    } catch (error) {
+      setNotice(messageFromError(error, "Archive clear failed."));
+    }
   }
 
   function toggleScenario(scenarioId: string) {
@@ -1265,6 +1302,18 @@ function buildDashboard(
 
 function classNames(...values: (string | false | undefined)[]) {
   return values.filter(Boolean).join(" ");
+}
+
+async function readJsonBody<T>(response: Response, fallback: T): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function messageFromError(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function riskTextClass(risk: RiskLevel) {
