@@ -1,6 +1,6 @@
 import type { Scenario } from "@/scenarios/types";
-import { createOpenRouterSession } from "@/lib/browser-runner/openrouterClient";
-import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
+import { getScenarioDefinition } from "@/scenarios/registry";
+import type { RunnerTraceEvent } from "@/lib/browser-runner/trace";
 
 export type RunScenarioInput = {
   scenario: Scenario;
@@ -10,12 +10,15 @@ export type RunScenarioInput = {
 };
 
 export async function runScenario(input: RunScenarioInput): Promise<void> {
-  createOpenRouterSession({
-    apiKey: input.openRouterKey,
-    model: input.model,
-  });
+  const scenarioDefinition = getScenarioDefinition(input.scenario.id);
 
-  input.onTrace(
-    createTraceEvent(0, "status", "Browser runner scaffold is ready for implementation."),
-  );
+  if (!scenarioDefinition) {
+    throw new Error(`Scenario not found: ${input.scenario.id}`);
+  }
+
+  await scenarioDefinition.run({
+    openRouterKey: input.openRouterKey,
+    model: input.model,
+    onTrace: input.onTrace,
+  });
 }
