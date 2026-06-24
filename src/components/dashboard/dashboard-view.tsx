@@ -98,7 +98,11 @@ function RecentRunsList() {
   return (
     <div className="divide-y divide-border">
       {runs.map((run) => (
-        <div key={run._id} className="grid grid-cols-5 gap-3 px-5 py-3 text-sm">
+        <Link
+          key={run._id}
+          href={`/runs/${run._id}`}
+          className="grid grid-cols-5 gap-3 px-5 py-3 text-sm transition hover:bg-background"
+        >
           <div className="min-w-0">
             <p className="truncate font-medium">{run.scenarioTitle}</p>
             <p className="truncate font-mono text-xs text-muted">{run.scenarioId}</p>
@@ -107,7 +111,7 @@ function RecentRunsList() {
           <span className="capitalize">{run.status}</span>
           <span>{run.canaryTriggered ? "Triggered" : "Clear"}</span>
           <span>{run.score === undefined ? "-" : run.score}</span>
-        </div>
+        </Link>
       ))}
     </div>
   );
