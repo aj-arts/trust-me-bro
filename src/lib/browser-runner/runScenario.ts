@@ -1,5 +1,4 @@
 import type { Scenario } from "@/scenarios/types";
-import { getScenarioDefinition } from "@/scenarios/registry";
 import type { RunnerTraceEvent } from "@/lib/browser-runner/trace";
 
 export type RunScenarioInput = {
@@ -10,15 +9,47 @@ export type RunScenarioInput = {
 };
 
 export async function runScenario(input: RunScenarioInput): Promise<void> {
-  const scenarioDefinition = getScenarioDefinition(input.scenario.id);
+  const response = await fetch("/api/run-scenario", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scenarioId: input.scenario.id,
+      openRouterKey: input.openRouterKey,
+      model: input.model,
+    }),
+  });
 
-  if (!scenarioDefinition) {
-    throw new Error(`Scenario not found: ${input.scenario.id}`);
+  if (!response.ok) {
+    throw new Error(await response.text());
   }
 
-  await scenarioDefinition.run({
-    openRouterKey: input.openRouterKey,
-    model: input.model,
-    onTrace: input.onTrace,
-  });
+  if (!response.body) {
+    throw new Error("Scenario response did not include a trace stream.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let failed = false;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as RunnerTraceEvent;
+      input.onTrace(event);
+      failed ||= event.type === "error";
+    }
+
+    if (done) break;
+  }
+
+  if (failed) {
+    throw new Error("Scenario failed.");
+  }
 }
