@@ -204,10 +204,13 @@ function RecentRunsSection({ runs }: { runs: RecentRun[] | undefined | null }) {
       (statusFilter === "all" || run.status === statusFilter)
     );
   });
+  const exportFilteredRuns = () => {
+    downloadCsv("filtered-runs.csv", runsToCsv(filteredRuns));
+  };
 
   return (
     <>
-      <div className="flex flex-wrap gap-3 border-b border-border px-5 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
         <RecentRunsFilter label="Scenario" value={scenarioFilter} onChange={setScenarioFilter}>
           <option value="all">All scenarios</option>
           {scenarioOptions.map(([id, title]) => (
@@ -232,6 +235,14 @@ function RecentRunsSection({ runs }: { runs: RecentRun[] | undefined | null }) {
             </option>
           ))}
         </RecentRunsFilter>
+        <button
+          type="button"
+          onClick={exportFilteredRuns}
+          disabled={filteredRuns.length === 0}
+          className="ml-auto inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-sm font-medium transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Export CSV
+        </button>
       </div>
       <div className="grid grid-cols-6 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
         <span>Scenario</span>
@@ -303,4 +314,45 @@ function formatStatus(status: RecentRun["status"]) {
 
 function formatScore(score?: number) {
   return score === undefined ? "-" : score;
+}
+
+function runsToCsv(runs: RecentRun[]) {
+  const columns = [
+    "scenarioId",
+    "scenarioTitle",
+    "model",
+    "systemPromptMode",
+    "status",
+    "canaryTriggered",
+    "score",
+    "runPath",
+  ];
+  const rows = runs.map((run) => [
+    run.scenarioId,
+    run.scenarioTitle,
+    run.model,
+    run.systemPromptMode ?? "",
+    run.status,
+    String(run.canaryTriggered),
+    run.score ?? "",
+    `/runs/${run._id}`,
+  ]);
+
+  return [columns, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
+function csvCell(value: string | number | boolean) {
+  const text = String(value);
+
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
