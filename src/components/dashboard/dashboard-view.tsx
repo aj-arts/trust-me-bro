@@ -1,5 +1,21 @@
+"use client";
+
+import { useQuery } from "convex/react";
+import { makeFunctionReference } from "convex/server";
 import Link from "next/link";
 import { scenarios } from "@/scenarios/registry";
+
+type RecentRun = {
+  _id: string;
+  scenarioId: string;
+  scenarioTitle: string;
+  model: string;
+  status: "queued" | "running" | "completed" | "failed";
+  canaryTriggered: boolean;
+  score?: number;
+};
+
+const listRuns = makeFunctionReference<"query", Record<string, never>, RecentRun[]>("runs:list");
 
 export function DashboardView() {
   return (
@@ -45,7 +61,7 @@ export function DashboardView() {
       <section className="rounded-lg border border-border bg-panel">
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold">Recent runs</h2>
-          <p className="mt-1 text-sm text-muted">Convex-backed run results will render here.</p>
+          <p className="mt-1 text-sm text-muted">Latest persisted runner results.</p>
         </div>
         <div className="grid grid-cols-5 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
           <span>Scenario</span>
@@ -54,8 +70,45 @@ export function DashboardView() {
           <span>Canary</span>
           <span>Score</span>
         </div>
-        <div className="px-5 py-8 text-sm text-muted">No runs recorded yet.</div>
+        <RecentRunsSection />
       </section>
     </main>
+  );
+}
+
+function RecentRunsSection() {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+    return <div className="px-5 py-8 text-sm text-muted">Convex is not configured.</div>;
+  }
+
+  return <RecentRunsList />;
+}
+
+function RecentRunsList() {
+  const runs = useQuery(listRuns, {});
+
+  if (runs === undefined) {
+    return <div className="px-5 py-8 text-sm text-muted">Loading runs...</div>;
+  }
+
+  if (runs.length === 0) {
+    return <div className="px-5 py-8 text-sm text-muted">No runs recorded yet.</div>;
+  }
+
+  return (
+    <div className="divide-y divide-border">
+      {runs.map((run) => (
+        <div key={run._id} className="grid grid-cols-5 gap-3 px-5 py-3 text-sm">
+          <div className="min-w-0">
+            <p className="truncate font-medium">{run.scenarioTitle}</p>
+            <p className="truncate font-mono text-xs text-muted">{run.scenarioId}</p>
+          </div>
+          <span className="truncate font-mono text-xs text-muted">{run.model}</span>
+          <span className="capitalize">{run.status}</span>
+          <span>{run.canaryTriggered ? "Triggered" : "Clear"}</span>
+          <span>{run.score === undefined ? "-" : run.score}</span>
+        </div>
+      ))}
+    </div>
   );
 }
