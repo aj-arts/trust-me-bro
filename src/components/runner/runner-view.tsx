@@ -2,12 +2,20 @@
 
 import {
   Bot,
+  Brain,
   ChevronLeft,
+  CheckCircle2,
   Circle,
+  FilePenLine,
   FileText,
+  Info,
   KeyRound,
   Loader2,
+  MessageSquareText,
   Play,
+  ShieldAlert,
+  Terminal,
+  Wrench,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -357,19 +365,175 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
             />
           ) : (
             events.map((event) => (
-              <MessageBubble
-                key={`${event.seq}-${event.timestamp}`}
-                label={event.type}
-                tone={event.type === "error" ? "error" : "agent"}
-                message={event.message}
-                compact={compact}
-              />
+              <TraceEventCard key={`${event.seq}-${event.timestamp}`} event={event} compact={compact} />
             ))
           )}
         </div>
       </div>
     </div>
   );
+}
+
+type TraceEventCardProps = {
+  event: RunnerTraceEvent;
+  compact: boolean;
+};
+
+function TraceEventCard({ event, compact }: TraceEventCardProps) {
+  if (event.type === "status") {
+    return (
+      <div className="flex items-start gap-2 px-1 py-1 text-xs leading-5 text-muted">
+        <Info aria-hidden="true" size={14} className="mt-0.5 shrink-0" />
+        <span>{event.message}</span>
+      </div>
+    );
+  }
+
+  const meta = traceMeta(event.type);
+  const body = event.type === "tool_call" ? parseToolCall(event.message) : null;
+  const [title, rest] = splitFirstLine(event.message);
+
+  return (
+    <article className={`rounded-lg border ${meta.frame} ${compact ? "p-3" : "p-4"}`}>
+      <div className="mb-2 flex items-center gap-2">
+        <span className={`inline-flex size-6 items-center justify-center rounded-md ${meta.iconBg}`}>
+          <TraceIcon type={event.type} />
+        </span>
+        <p className="font-mono text-xs uppercase text-muted">{meta.label}</p>
+      </div>
+
+      {body ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-[#1f2733]">
+            {body.action} <code className="font-mono text-[0.9em]">{body.tool}</code>
+          </p>
+          {body.args ? <CodeBlock text={body.args} compact={compact} /> : null}
+        </div>
+      ) : event.type === "command" || event.type === "tool_result" ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-[#1f2733]">{title}</p>
+          {rest ? <CodeBlock text={rest} compact={compact} /> : null}
+        </div>
+      ) : event.type === "file_change" ? (
+        <div className="space-y-2">
+          <p className="font-mono text-sm font-medium text-[#1f2733]">{title}</p>
+          {rest ? <CodeBlock text={rest} compact={compact} /> : null}
+        </div>
+      ) : (
+        <p className={`${meta.text} ${compact ? "text-sm leading-6" : "text-base leading-7"}`}>
+          {event.message}
+        </p>
+      )}
+    </article>
+  );
+}
+
+function traceMeta(type: RunnerTraceEvent["type"]) {
+  switch (type) {
+    case "reasoning":
+      return {
+        label: "Reasoning",
+        frame: "border-[#dde3ee] bg-[#fbfcff]",
+        iconBg: "bg-[#eef2f7] text-muted",
+        text: "whitespace-pre-wrap text-muted",
+      };
+    case "tool_call":
+      return {
+        label: "Tool Call",
+        frame: "border-[#c8d7f2] bg-[#f7faff]",
+        iconBg: "bg-[#e8eefc] text-accent",
+        text: "whitespace-pre-wrap text-[#1f2733]",
+      };
+    case "tool_result":
+      return {
+        label: "Tool Result",
+        frame: "border-[#d4e7db] bg-[#f7fcf8]",
+        iconBg: "bg-[#e4f4e9] text-success",
+        text: "whitespace-pre-wrap text-[#1f2733]",
+      };
+    case "command":
+      return {
+        label: "Command",
+        frame: "border-[#d9dee8] bg-white",
+        iconBg: "bg-[#eef2f7] text-muted",
+        text: "whitespace-pre-wrap font-mono text-[#1f2733]",
+      };
+    case "file_change":
+      return {
+        label: "File Write",
+        frame: "border-[#ded8c8] bg-[#fffdf7]",
+        iconBg: "bg-[#f6eedb] text-[#8a5a13]",
+        text: "whitespace-pre-wrap text-[#1f2733]",
+      };
+    case "canary":
+      return {
+        label: "Canary",
+        frame: "border-[#fecaca] bg-[#fff7f7]",
+        iconBg: "bg-[#fee2e2] text-danger",
+        text: "whitespace-pre-wrap font-medium text-danger",
+      };
+    case "error":
+      return {
+        label: "Error",
+        frame: "border-[#fecaca] bg-[#fff7f7]",
+        iconBg: "bg-[#fee2e2] text-danger",
+        text: "whitespace-pre-wrap text-danger",
+      };
+    default:
+      return {
+        label: "Assistant",
+        frame: "border-border bg-white",
+        iconBg: "bg-[#eef2f7] text-muted",
+        text: "whitespace-pre-wrap text-[#1f2733]",
+      };
+  }
+}
+
+function TraceIcon({ type }: { type: RunnerTraceEvent["type"] }) {
+  if (type === "reasoning") return <Brain aria-hidden="true" size={14} />;
+  if (type === "tool_call") return <Wrench aria-hidden="true" size={14} />;
+  if (type === "tool_result") return <CheckCircle2 aria-hidden="true" size={14} />;
+  if (type === "command") return <Terminal aria-hidden="true" size={14} />;
+  if (type === "file_change") return <FilePenLine aria-hidden="true" size={14} />;
+  if (type === "canary" || type === "error") return <ShieldAlert aria-hidden="true" size={14} />;
+  return <MessageSquareText aria-hidden="true" size={14} />;
+}
+
+function CodeBlock({ text, compact }: { text: string; compact: boolean }) {
+  return (
+    <pre
+      className={`overflow-x-auto rounded-md border border-[#d9dee8] bg-[#f8fafc] font-mono text-[#263244] ${
+        compact ? "p-2 text-xs leading-5" : "p-3 text-sm leading-6"
+      }`}
+    >
+      <code>{text}</code>
+    </pre>
+  );
+}
+
+function parseToolCall(message: string) {
+  const match = message.match(/^(Requested|Running) ([^ ]+) ?(.*)$/);
+  if (!match) return null;
+
+  return {
+    action: match[1],
+    tool: match[2],
+    args: prettyJson(match[3]),
+  };
+}
+
+function prettyJson(text: string) {
+  if (!text.trim()) return "";
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+function splitFirstLine(text: string) {
+  const index = text.indexOf("\n");
+  return index === -1 ? [text, ""] : [text.slice(0, index), text.slice(index + 1)];
 }
 
 type MessageBubbleProps = {

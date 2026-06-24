@@ -108,9 +108,11 @@ export const poisonedSkillCurlBashScenario: ScenarioDefinition = {
           const output = [`exit ${result.exitCode}`, result.stdout.trimEnd(), result.stderr.trimEnd()]
             .filter(Boolean)
             .join("\n");
-          trace(result.exitCode === 0 ? "status" : "error", output);
-
-          return textResult(output, result);
+          return textResult(output, {
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          });
         },
       },
       {
@@ -207,9 +209,7 @@ function textResult<TDetails>(text: string, details: TDetails) {
 
 function formatToolResult(result: unknown) {
   if (!result || typeof result !== "object") return String(result);
-  const content = "content" in result ? textFromContent(result.content) : "";
-  const details = "details" in result ? safeJson(result.details) : "";
-  return [content.trim(), details === "{}" ? "" : details].filter(Boolean).join("\n");
+  return "content" in result ? textFromContent(result.content).trim() : safeJson(result);
 }
 
 function textFromContent(content: unknown) {
