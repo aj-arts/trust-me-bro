@@ -17,6 +17,7 @@ type RecentRun = {
 };
 
 const listRuns = makeFunctionReference<"query", Record<string, never>, RecentRun[]>("runs:list");
+const systemPromptModes = ["safe", "neutral", "permissive"] as const;
 
 export function DashboardView() {
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
@@ -79,6 +80,8 @@ function DashboardContent({ runs }: { runs: RecentRun[] | undefined | null }) {
         ))}
       </section>
 
+      {runs !== null ? <ModeComparisonSection runs={runs} /> : null}
+
       <section className="rounded-lg border border-border bg-panel">
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold">Recent runs</h2>
@@ -95,6 +98,69 @@ function DashboardContent({ runs }: { runs: RecentRun[] | undefined | null }) {
         <RecentRunsSection runs={runs} />
       </section>
     </main>
+  );
+}
+
+function ModeComparisonSection({ runs }: { runs: RecentRun[] | undefined }) {
+  if (runs === undefined) {
+    return (
+      <section className="rounded-lg border border-border bg-panel px-5 py-4">
+        <h2 className="text-base font-semibold">Mode comparison</h2>
+        <p className="mt-2 text-sm text-muted">Loading mode comparison...</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-panel">
+      <div className="border-b border-border px-5 py-4">
+        <h2 className="text-base font-semibold">Mode comparison</h2>
+        <p className="mt-1 text-sm text-muted">Latest run for each scenario and prompt mode.</p>
+      </div>
+      <div className="grid grid-cols-4 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
+        <span>Scenario</span>
+        {systemPromptModes.map((mode) => (
+          <span key={mode}>{formatSystemPromptMode(mode)}</span>
+        ))}
+      </div>
+      <div className="divide-y divide-border">
+        {scenarios.map((scenario) => (
+          <div key={scenario.id} className="grid grid-cols-4 gap-3 px-5 py-3 text-sm">
+            <div className="min-w-0">
+              <p className="truncate font-medium">{scenario.title}</p>
+              <p className="truncate font-mono text-xs text-muted">{scenario.id}</p>
+            </div>
+            {systemPromptModes.map((mode) => (
+              <ModeComparisonCell
+                key={mode}
+                run={runs.find((run) => run.scenarioId === scenario.id && run.systemPromptMode === mode)}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModeComparisonCell({ run }: { run?: RecentRun }) {
+  if (!run) {
+    return <span className="font-mono text-xs text-muted">No run</span>;
+  }
+
+  return (
+    <Link
+      href={`/runs/${run._id}`}
+      className="min-w-0 rounded-md border border-border px-3 py-2 transition hover:border-accent"
+    >
+      <span className="block font-mono text-xs">Score {formatScore(run.score)}</span>
+      <span className="mt-1 block text-xs text-muted">
+        {run.canaryTriggered ? "Canary triggered" : "Canary clear"}
+      </span>
+      <span className="mt-1 block truncate font-mono text-xs text-muted">
+        {run.model} - {run.status}
+      </span>
+    </Link>
   );
 }
 
