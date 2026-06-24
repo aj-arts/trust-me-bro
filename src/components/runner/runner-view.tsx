@@ -17,9 +17,22 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import bash from "react-syntax-highlighter/dist/esm/languages/prism/bash";
+import json from "react-syntax-highlighter/dist/esm/languages/prism/json";
+import markdown from "react-syntax-highlighter/dist/esm/languages/prism/markdown";
+import tsx from "react-syntax-highlighter/dist/esm/languages/prism/tsx";
+import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript";
+import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
+import oneLight from "react-syntax-highlighter/dist/esm/styles/prism/one-light";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
 import type { Scenario } from "@/scenarios/types";
+
+SyntaxHighlighter.registerLanguage("bash", bash);
+SyntaxHighlighter.registerLanguage("json", json);
+SyntaxHighlighter.registerLanguage("markdown", markdown);
+SyntaxHighlighter.registerLanguage("tsx", tsx);
+SyntaxHighlighter.registerLanguage("typescript", typescript);
 
 type RunnerViewProps = {
   scenario: Scenario;
@@ -88,7 +101,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         openRouterKey,
         model,
         onTrace: (event) => {
-          setTraceEvents((currentEvents) => [...currentEvents, event]);
+          setTraceEvents((currentEvents) => upsertTraceEvent(currentEvents, event));
         },
       });
       setRunState("completed");
@@ -316,7 +329,6 @@ function FileEditor({ path, contents, onClose }: FileEditorProps) {
           code={contents}
           language={languageForPath(path)}
           variant="pane"
-          className="min-h-full p-5 text-sm leading-6"
         />
       </div>
     </div>
@@ -333,6 +345,13 @@ type TraceConversationProps = {
 function TraceConversation({ scenario, events, runState, density }: TraceConversationProps) {
   const compact = density === "compact";
   const visibleEvents = events.filter((event) => event.type !== "status" && event.type !== "tool_call");
+  const latestEvent = visibleEvents.at(-1);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  }, [latestEvent?.seq, latestEvent?.message, runState]);
 
   return (
     <div className="flex h-full min-h-[520px] flex-col xl:min-h-0">
@@ -349,7 +368,7 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
         <RunStatus state={runState} />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto px-3 py-3">
+      <div ref={scrollerRef} className="min-h-0 flex-1 overflow-auto px-3 py-3">
         <div className={compact ? "space-y-2.5" : "mx-auto max-w-4xl space-y-3"}>
           <MessageBubble
             label="User task"
@@ -371,7 +390,7 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
             />
           ) : (
             visibleEvents.map((event) => (
-              <TraceEventCard key={`${event.seq}-${event.timestamp}`} event={event} compact={compact} />
+              <TraceEventCard key={event.seq} event={event} compact={compact} />
             ))
           )}
         </div>
@@ -394,13 +413,13 @@ function TraceEventCard({ event, compact }: TraceEventCardProps) {
       <HighlightedCode
         code={event.message}
         language="bash"
-        className={compact ? "p-2 text-xs leading-5" : "p-2.5 text-sm leading-6"}
+        compact={compact}
       />
     ) : event.type === "tool_result" ? (
       <HighlightedCode
         code={event.message}
         language="text"
-        className={compact ? "p-2 text-xs leading-5" : "p-2.5 text-sm leading-6"}
+        compact={compact}
       />
     ) : event.type === "file_change" ? (
       <div className="space-y-1.5">
@@ -409,7 +428,7 @@ function TraceEventCard({ event, compact }: TraceEventCardProps) {
           <HighlightedCode
             code={rest}
             language={languageForPath(path)}
-            className={compact ? "p-2 text-xs leading-5" : "p-2.5 text-sm leading-6"}
+            compact={compact}
           />
         ) : null}
       </div>
@@ -510,122 +529,68 @@ function splitFirstLine(text: string) {
   return index === -1 ? [text, ""] : [text.slice(0, index), text.slice(index + 1)];
 }
 
-type SyntaxLanguage = "bash" | "json" | "markdown" | "text" | "ts" | "tsx";
+type SyntaxLanguage = "bash" | "json" | "markdown" | "text" | "tsx" | "typescript";
 
 function HighlightedCode({
   code,
   language,
-  className = "",
+  compact = false,
   variant = "block",
 }: {
   code: string;
   language: SyntaxLanguage | string;
-  className?: string;
+  compact?: boolean;
   variant?: "block" | "pane";
 }) {
-  const frame =
-    variant === "pane"
-      ? "overflow-x-auto bg-white font-mono text-[#263244]"
-      : "overflow-x-auto rounded-md border border-[#d9dee8] bg-[#f8fafc] font-mono text-[#263244]";
+  const isPane = variant === "pane";
 
   return (
-    <pre className={`${frame} ${className}`}>
-      <code>{highlightCode(code, language)}</code>
-    </pre>
+    <SyntaxHighlighter
+      language={language === "text" ? undefined : language}
+      style={oneLight}
+      customStyle={{
+        margin: 0,
+        minHeight: isPane ? "100%" : undefined,
+        overflowX: "auto",
+        border: isPane ? "none" : "1px solid #d9dee8",
+        borderRadius: isPane ? 0 : 6,
+        background: isPane ? "#fff" : "#f8fafc",
+        color: "#263244",
+        padding: isPane ? "1.25rem" : compact ? "0.5rem" : "0.625rem",
+        fontSize: compact ? "0.75rem" : "0.875rem",
+        lineHeight: compact ? "1.25rem" : "1.5rem",
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
+      }}
+      codeTagProps={{ style: { fontFamily: "inherit" } }}
+      wrapLongLines={false}
+    >
+      {code}
+    </SyntaxHighlighter>
   );
 }
 
 function languageForPath(path: string): SyntaxLanguage {
   const lowerPath = path.toLowerCase();
   if (lowerPath.endsWith(".tsx")) return "tsx";
-  if (lowerPath.endsWith(".ts") || lowerPath.endsWith(".js") || lowerPath.endsWith(".jsx")) return "ts";
+  if (lowerPath.endsWith(".ts") || lowerPath.endsWith(".js")) return "typescript";
+  if (lowerPath.endsWith(".jsx")) return "tsx";
   if (lowerPath.endsWith(".json")) return "json";
   if (lowerPath.endsWith(".md") || lowerPath.endsWith(".mdx")) return "markdown";
   if (lowerPath.endsWith(".sh") || lowerPath.endsWith(".bash")) return "bash";
   return "text";
 }
 
-const syntaxClass = {
-  command: "text-[#075985] font-medium",
-  comment: "text-[#64748b] italic",
-  flag: "text-[#9a3412]",
-  key: "text-[#6d28d9]",
-  keyword: "text-[#0f5ea8] font-medium",
-  number: "text-[#a15c00]",
-  path: "text-[#475569]",
-  string: "text-[#166534]",
-} as const;
+function upsertTraceEvent(events: RunnerTraceEvent[], event: RunnerTraceEvent) {
+  const streamId = typeof event.metadata?.streamId === "string" ? event.metadata.streamId : null;
+  if (!streamId) return [...events, event];
 
-type SyntaxKind = keyof typeof syntaxClass;
+  const index = events.findIndex((candidate) => candidate.metadata?.streamId === streamId);
+  if (index === -1) return [...events, event];
 
-function highlightCode(code: string, language: string): ReactNode[] {
-  if (language === "json") {
-    return highlightWith(code, /("(?:\\.|[^"\\])*"(?=\s*:)|"(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?\b)/g, (token, index, source) => {
-      if (token.startsWith('"')) return /^\s*:/.test(source.slice(index + token.length)) ? "key" : "string";
-      if (/^-?\d/.test(token)) return "number";
-      return "keyword";
-    });
-  }
-
-  if (language === "bash") {
-    return highlightWith(code, /(#.*|^\$[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:bash|cat|chmod|curl|echo|exit|find|grep|head|ls|mkdir|npm|pnpm|pwd|rg|sed|touch)\b|\s-{1,2}[\w-]+|\/[\w./:-]+)/gm, bashTokenKind);
-  }
-
-  if (language === "markdown") {
-    return highlightWith(code, /(^#{1,6}[^\n]*|^```[^\n]*|`[^`\n]+`|\[[^\]]+\]\([^)]+\)|\b(?:bash|cat|curl|echo|find|npm|pnpm)\b|\s-{1,2}[\w-]+|\/[\w./:-]+)/gm, (token) => {
-      if (token.startsWith("#")) return "keyword";
-      if (token.startsWith("```")) return "comment";
-      if (token.startsWith("`")) return "string";
-      if (token.startsWith("[")) return "path";
-      return bashTokenKind(token);
-    });
-  }
-
-  if (language === "ts" || language === "tsx") {
-    return highlightWith(code, /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:async|await|boolean|class|const|else|export|extends|false|for|from|function|if|import|interface|let|new|null|number|return|string|true|type|undefined|var|while)\b|\b\d+(?:\.\d+)?\b)/g, (token) => {
-      if (token.startsWith("//") || token.startsWith("/*")) return "comment";
-      if (/^["'`]/.test(token)) return "string";
-      if (/^\d/.test(token)) return "number";
-      return "keyword";
-    });
-  }
-
-  return [code];
-}
-
-function bashTokenKind(token: string): SyntaxKind {
-  const trimmed = token.trim();
-  if (trimmed.startsWith("#")) return "comment";
-  if (trimmed.startsWith("$")) return "command";
-  if (/^["']/.test(trimmed)) return "string";
-  if (trimmed.startsWith("-")) return "flag";
-  if (trimmed.startsWith("/")) return "path";
-  return "keyword";
-}
-
-function highlightWith(
-  code: string,
-  pattern: RegExp,
-  classify: (token: string, index: number, source: string) => SyntaxKind,
-) {
-  const nodes: ReactNode[] = [];
-  let offset = 0;
-
-  for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0;
-    if (index > offset) nodes.push(code.slice(offset, index));
-
-    const token = match[0];
-    nodes.push(
-      <span key={`${index}-${token.length}`} className={syntaxClass[classify(token, index, code)]}>
-        {token}
-      </span>,
-    );
-    offset = index + token.length;
-  }
-
-  if (offset < code.length) nodes.push(code.slice(offset));
-  return nodes.length ? nodes : [code];
+  const nextEvents = [...events];
+  nextEvents[index] = event;
+  return nextEvents;
 }
 
 type MessageBubbleProps = {
