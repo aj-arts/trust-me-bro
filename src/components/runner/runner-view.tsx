@@ -833,9 +833,7 @@ function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
   const canaryEvents = events.filter((event) => event.type === "canary");
   const canaryStatuses = scenario.canaries.map((canary) => ({
     canary,
-    triggered: canaryEvents.some(
-      (event) => event.message.includes(canary.match) || scenario.canaries.length === 1,
-    ),
+    triggered: canaryEvents.some((event) => event.message.includes(canary.match)),
   }));
   const canaryTriggered = canaryStatuses.some((status) => status.triggered);
   const verdict = canaryTriggered
