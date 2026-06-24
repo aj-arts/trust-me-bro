@@ -186,15 +186,12 @@ export function RunnerView({ scenario }: RunnerViewProps) {
     };
   }, [convexClient]);
 
-  async function handleStartRun() {
-    if (!openRouterKey.trim() || runState === "running") {
-      return;
-    }
-
+  async function runMode(mode: SystemPromptMode) {
+    setSystemPromptMode(mode);
     setSelectedFile(null);
-    setRunState("running");
     setTraceEvents([]);
 
+    let succeeded = false;
     let persistedRunId: GenericId<"runs"> | null = null;
     let runEvents: RunnerTraceEvent[] = [];
     const pendingWrites: Promise<unknown>[] = [];
@@ -209,7 +206,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
             scenarioId: scenario.id,
             scenarioTitle: scenario.title,
             model,
-            systemPromptMode,
+            systemPromptMode: mode,
           });
           persist(convexClient.mutation(updateRunStatus, { runId: persistedRunId, status: "running" }));
         } catch (error) {
@@ -223,7 +220,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         scenario,
         openRouterKey,
         model,
-        systemPromptMode,
+        systemPromptMode: mode,
         onTrace: (event) => {
           runEvents = upsertTraceEvent(runEvents, event);
           setTraceEvents((currentEvents) => upsertTraceEvent(currentEvents, event));
@@ -244,12 +241,11 @@ export function RunnerView({ scenario }: RunnerViewProps) {
           score: canaryTriggered ? 0 : 1,
         }).catch((error) => console.warn("Failed to persist run completion.", error));
       }
-      setRunState("completed");
+      succeeded = true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runner failed.";
       const errorEvent = createTraceEvent(runEvents.length, "error", message);
       runEvents = [...runEvents, errorEvent];
-      setRunState("failed");
       setTraceEvents((currentEvents) => [...currentEvents, errorEvent]);
       if (convexClient && persistedRunId) {
         persist(convexClient.mutation(appendTraceEvent, { ...errorEvent, type: "error", runId: persistedRunId }));
@@ -265,6 +261,40 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         }).catch((error) => console.warn("Failed to persist run failure.", error));
       }
     }
+
+    return succeeded;
+  }
+
+  async function handleStartRun() {
+    if (!openRouterKey.trim() || runState === "running") {
+      return;
+    }
+
+    setRunState("running");
+    const succeeded = await runMode(systemPromptMode);
+    setRunState(succeeded ? "completed" : "failed");
+  }
+
+  async function handleRunAllModes() {
+    if (!openRouterKey.trim() || runState === "running") {
+      return;
+    }
+
+    setRunState("running");
+    let failed = false;
+
+    for (const mode of systemPromptModes) {
+      const succeeded = await runMode(mode.id);
+      failed ||= !succeeded;
+    }
+
+    if (failed) {
+      setTraceEvents((currentEvents) => [
+        ...currentEvents,
+        createTraceEvent(currentEvents.length, "error", "One or more mode runs failed."),
+      ]);
+    }
+    setRunState(failed ? "failed" : "completed");
   }
 
   return (
@@ -367,6 +397,15 @@ export function RunnerView({ scenario }: RunnerViewProps) {
                   <Play aria-hidden="true" size={16} />
                 )}
                 {runState === "running" ? "Running" : "Start run"}
+              </button>
+              <button
+                type="button"
+                disabled={!openRouterKey.trim() || runState === "running"}
+                onClick={handleRunAllModes}
+                className="mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-border bg-white px-3 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <CircleCheckBig aria-hidden="true" size={16} />
+                Run all modes
               </button>
             </section>
 
