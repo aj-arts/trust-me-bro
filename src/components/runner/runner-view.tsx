@@ -403,7 +403,13 @@ function MessageBubble({ label, tone, message, compact }: MessageBubbleProps) {
         />
         <p className="font-mono text-xs uppercase text-muted">{label}</p>
       </div>
-      <p className={compact ? "text-sm leading-6" : "text-base leading-7"}>{message}</p>
+      <p
+        className={
+          compact ? "whitespace-pre-wrap text-sm leading-6" : "whitespace-pre-wrap text-base leading-7"
+        }
+      >
+        {message}
+      </p>
     </article>
   );
 }
