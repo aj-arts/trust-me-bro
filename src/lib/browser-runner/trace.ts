@@ -1,6 +1,8 @@
 export type TraceEventType =
   | "agent"
+  | "reasoning"
   | "tool_call"
+  | "tool_result"
   | "command"
   | "file_change"
   | "canary"

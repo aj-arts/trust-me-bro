@@ -1,4 +1,4 @@
-import { Bash } from "just-bash";
+import { Bash } from "just-bash/browser";
 
 export type BrowserSandbox = {
   bash: Bash;

@@ -7,6 +7,7 @@ const runStatus = v.union(
   v.literal("completed"),
   v.literal("failed"),
 );
+const systemPromptMode = v.union(v.literal("safe"), v.literal("neutral"), v.literal("permissive"));
 
 export const list = query({
   args: {},
@@ -48,12 +49,14 @@ export const create = mutation({
     scenarioId: v.string(),
     scenarioTitle: v.string(),
     model: v.string(),
+    systemPromptMode,
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("runs", {
       scenarioId: args.scenarioId,
       scenarioTitle: args.scenarioTitle,
       model: args.model,
+      systemPromptMode: args.systemPromptMode,
       status: "queued",
       startedAt: Date.now(),
       canaryTriggered: false,
