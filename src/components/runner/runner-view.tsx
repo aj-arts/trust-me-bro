@@ -8,18 +8,16 @@ import {
   Circle,
   FilePenLine,
   FileText,
-  Info,
   KeyRound,
   Loader2,
   MessageSquareText,
   Play,
   ShieldAlert,
   Terminal,
-  Wrench,
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
 import type { Scenario } from "@/scenarios/types";
 
@@ -314,9 +312,12 @@ function FileEditor({ path, contents, onClose }: FileEditorProps) {
         </button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto bg-white">
-        <pre className="min-h-full p-5 font-mono text-sm leading-6 text-[#263244]">
-          <code>{contents}</code>
-        </pre>
+        <HighlightedCode
+          code={contents}
+          language={languageForPath(path)}
+          variant="pane"
+          className="min-h-full p-5 text-sm leading-6"
+        />
       </div>
     </div>
   );
@@ -331,6 +332,7 @@ type TraceConversationProps = {
 
 function TraceConversation({ scenario, events, runState, density }: TraceConversationProps) {
   const compact = density === "compact";
+  const visibleEvents = events.filter((event) => event.type !== "status" && event.type !== "tool_call");
 
   return (
     <div className="flex h-full min-h-[520px] flex-col xl:min-h-0">
@@ -347,8 +349,8 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
         <RunStatus state={runState} />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-5">
-        <div className={compact ? "space-y-4" : "mx-auto max-w-3xl space-y-5"}>
+      <div className="min-h-0 flex-1 overflow-auto px-3 py-3">
+        <div className={compact ? "space-y-2.5" : "mx-auto max-w-4xl space-y-3"}>
           <MessageBubble
             label="User task"
             tone="user"
@@ -356,15 +358,19 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
             compact={compact}
           />
 
-          {events.length === 0 ? (
+          {visibleEvents.length === 0 ? (
             <MessageBubble
               label="Agent"
               tone="agent"
-              message="Runner not started. Start the run to stream scenario trace events."
+              message={
+                events.length === 0
+                  ? "Runner not started. Start the run to stream scenario trace events."
+                  : "Waiting for reasoning, commands, file writes, or canary events."
+              }
               compact={compact}
             />
           ) : (
-            events.map((event) => (
+            visibleEvents.map((event) => (
               <TraceEventCard key={`${event.seq}-${event.timestamp}`} event={event} compact={compact} />
             ))
           )}
@@ -380,50 +386,50 @@ type TraceEventCardProps = {
 };
 
 function TraceEventCard({ event, compact }: TraceEventCardProps) {
-  if (event.type === "status") {
-    return (
-      <div className="flex items-start gap-2 px-1 py-1 text-xs leading-5 text-muted">
-        <Info aria-hidden="true" size={14} className="mt-0.5 shrink-0" />
-        <span>{event.message}</span>
-      </div>
-    );
-  }
-
   const meta = traceMeta(event.type);
-  const body = event.type === "tool_call" ? parseToolCall(event.message) : null;
   const [title, rest] = splitFirstLine(event.message);
+  const path = title.replace(/^Wrote /, "");
+  const body =
+    event.type === "command" ? (
+      <HighlightedCode
+        code={event.message}
+        language="bash"
+        className={compact ? "p-2 text-xs leading-5" : "p-2.5 text-sm leading-6"}
+      />
+    ) : event.type === "tool_result" ? (
+      <HighlightedCode
+        code={event.message}
+        language="text"
+        className={compact ? "p-2 text-xs leading-5" : "p-2.5 text-sm leading-6"}
+      />
+    ) : event.type === "file_change" ? (
+      <div className="space-y-1.5">
+        <p className="truncate font-mono text-xs text-muted">{path}</p>
+        {rest ? (
+          <HighlightedCode
+            code={rest}
+            language={languageForPath(path)}
+            className={compact ? "p-2 text-xs leading-5" : "p-2.5 text-sm leading-6"}
+          />
+        ) : null}
+      </div>
+    ) : (
+      <p className={`${meta.text} ${compact ? "text-sm leading-5" : "text-sm leading-6"}`}>
+        {event.message}
+      </p>
+    );
 
   return (
-    <article className={`rounded-lg border ${meta.frame} ${compact ? "p-3" : "p-4"}`}>
-      <div className="mb-2 flex items-center gap-2">
-        <span className={`inline-flex size-6 items-center justify-center rounded-md ${meta.iconBg}`}>
+    <article className={`rounded-md border ${meta.frame} ${compact ? "p-2" : "p-2.5"}`}>
+      <div className="flex items-start gap-2">
+        <span className={`mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-md ${meta.iconBg}`}>
           <TraceIcon type={event.type} />
         </span>
-        <p className="font-mono text-xs uppercase text-muted">{meta.label}</p>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 font-mono text-[11px] uppercase text-muted">{meta.label}</p>
+          {body}
+        </div>
       </div>
-
-      {body ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-[#1f2733]">
-            {body.action} <code className="font-mono text-[0.9em]">{body.tool}</code>
-          </p>
-          {body.args ? <CodeBlock text={body.args} compact={compact} /> : null}
-        </div>
-      ) : event.type === "command" || event.type === "tool_result" ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-[#1f2733]">{title}</p>
-          {rest ? <CodeBlock text={rest} compact={compact} /> : null}
-        </div>
-      ) : event.type === "file_change" ? (
-        <div className="space-y-2">
-          <p className="font-mono text-sm font-medium text-[#1f2733]">{title}</p>
-          {rest ? <CodeBlock text={rest} compact={compact} /> : null}
-        </div>
-      ) : (
-        <p className={`${meta.text} ${compact ? "text-sm leading-6" : "text-base leading-7"}`}>
-          {event.message}
-        </p>
-      )}
     </article>
   );
 }
@@ -433,15 +439,15 @@ function traceMeta(type: RunnerTraceEvent["type"]) {
     case "reasoning":
       return {
         label: "Reasoning",
-        frame: "border-[#dde3ee] bg-[#fbfcff]",
+        frame: "border-[#e3e8f1] bg-[#fbfcff]",
         iconBg: "bg-[#eef2f7] text-muted",
         text: "whitespace-pre-wrap text-muted",
       };
     case "tool_call":
       return {
         label: "Tool Call",
-        frame: "border-[#c8d7f2] bg-[#f7faff]",
-        iconBg: "bg-[#e8eefc] text-accent",
+        frame: "border-[#d9dee8] bg-[#fbfdff]",
+        iconBg: "bg-[#eef2f7] text-muted",
         text: "whitespace-pre-wrap text-[#1f2733]",
       };
     case "tool_result":
@@ -454,7 +460,7 @@ function traceMeta(type: RunnerTraceEvent["type"]) {
     case "command":
       return {
         label: "Command",
-        frame: "border-[#d9dee8] bg-white",
+        frame: "border-[#d9dee8] bg-[#fbfdff]",
         iconBg: "bg-[#eef2f7] text-muted",
         text: "whitespace-pre-wrap font-mono text-[#1f2733]",
       };
@@ -491,7 +497,7 @@ function traceMeta(type: RunnerTraceEvent["type"]) {
 
 function TraceIcon({ type }: { type: RunnerTraceEvent["type"] }) {
   if (type === "reasoning") return <Brain aria-hidden="true" size={14} />;
-  if (type === "tool_call") return <Wrench aria-hidden="true" size={14} />;
+  if (type === "tool_call") return <Terminal aria-hidden="true" size={14} />;
   if (type === "tool_result") return <CheckCircle2 aria-hidden="true" size={14} />;
   if (type === "command") return <Terminal aria-hidden="true" size={14} />;
   if (type === "file_change") return <FilePenLine aria-hidden="true" size={14} />;
@@ -499,41 +505,127 @@ function TraceIcon({ type }: { type: RunnerTraceEvent["type"] }) {
   return <MessageSquareText aria-hidden="true" size={14} />;
 }
 
-function CodeBlock({ text, compact }: { text: string; compact: boolean }) {
+function splitFirstLine(text: string) {
+  const index = text.indexOf("\n");
+  return index === -1 ? [text, ""] : [text.slice(0, index), text.slice(index + 1)];
+}
+
+type SyntaxLanguage = "bash" | "json" | "markdown" | "text" | "ts" | "tsx";
+
+function HighlightedCode({
+  code,
+  language,
+  className = "",
+  variant = "block",
+}: {
+  code: string;
+  language: SyntaxLanguage | string;
+  className?: string;
+  variant?: "block" | "pane";
+}) {
+  const frame =
+    variant === "pane"
+      ? "overflow-x-auto bg-white font-mono text-[#263244]"
+      : "overflow-x-auto rounded-md border border-[#d9dee8] bg-[#f8fafc] font-mono text-[#263244]";
+
   return (
-    <pre
-      className={`overflow-x-auto rounded-md border border-[#d9dee8] bg-[#f8fafc] font-mono text-[#263244] ${
-        compact ? "p-2 text-xs leading-5" : "p-3 text-sm leading-6"
-      }`}
-    >
-      <code>{text}</code>
+    <pre className={`${frame} ${className}`}>
+      <code>{highlightCode(code, language)}</code>
     </pre>
   );
 }
 
-function parseToolCall(message: string) {
-  const match = message.match(/^(Requested|Running) ([^ ]+) ?(.*)$/);
-  if (!match) return null;
-
-  return {
-    action: match[1],
-    tool: match[2],
-    args: prettyJson(match[3]),
-  };
+function languageForPath(path: string): SyntaxLanguage {
+  const lowerPath = path.toLowerCase();
+  if (lowerPath.endsWith(".tsx")) return "tsx";
+  if (lowerPath.endsWith(".ts") || lowerPath.endsWith(".js") || lowerPath.endsWith(".jsx")) return "ts";
+  if (lowerPath.endsWith(".json")) return "json";
+  if (lowerPath.endsWith(".md") || lowerPath.endsWith(".mdx")) return "markdown";
+  if (lowerPath.endsWith(".sh") || lowerPath.endsWith(".bash")) return "bash";
+  return "text";
 }
 
-function prettyJson(text: string) {
-  if (!text.trim()) return "";
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
+const syntaxClass = {
+  command: "text-[#075985] font-medium",
+  comment: "text-[#64748b] italic",
+  flag: "text-[#9a3412]",
+  key: "text-[#6d28d9]",
+  keyword: "text-[#0f5ea8] font-medium",
+  number: "text-[#a15c00]",
+  path: "text-[#475569]",
+  string: "text-[#166534]",
+} as const;
+
+type SyntaxKind = keyof typeof syntaxClass;
+
+function highlightCode(code: string, language: string): ReactNode[] {
+  if (language === "json") {
+    return highlightWith(code, /("(?:\\.|[^"\\])*"(?=\s*:)|"(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?\b)/g, (token, index, source) => {
+      if (token.startsWith('"')) return /^\s*:/.test(source.slice(index + token.length)) ? "key" : "string";
+      if (/^-?\d/.test(token)) return "number";
+      return "keyword";
+    });
   }
+
+  if (language === "bash") {
+    return highlightWith(code, /(#.*|^\$[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:bash|cat|chmod|curl|echo|exit|find|grep|head|ls|mkdir|npm|pnpm|pwd|rg|sed|touch)\b|\s-{1,2}[\w-]+|\/[\w./:-]+)/gm, bashTokenKind);
+  }
+
+  if (language === "markdown") {
+    return highlightWith(code, /(^#{1,6}[^\n]*|^```[^\n]*|`[^`\n]+`|\[[^\]]+\]\([^)]+\)|\b(?:bash|cat|curl|echo|find|npm|pnpm)\b|\s-{1,2}[\w-]+|\/[\w./:-]+)/gm, (token) => {
+      if (token.startsWith("#")) return "keyword";
+      if (token.startsWith("```")) return "comment";
+      if (token.startsWith("`")) return "string";
+      if (token.startsWith("[")) return "path";
+      return bashTokenKind(token);
+    });
+  }
+
+  if (language === "ts" || language === "tsx") {
+    return highlightWith(code, /(\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(?:async|await|boolean|class|const|else|export|extends|false|for|from|function|if|import|interface|let|new|null|number|return|string|true|type|undefined|var|while)\b|\b\d+(?:\.\d+)?\b)/g, (token) => {
+      if (token.startsWith("//") || token.startsWith("/*")) return "comment";
+      if (/^["'`]/.test(token)) return "string";
+      if (/^\d/.test(token)) return "number";
+      return "keyword";
+    });
+  }
+
+  return [code];
 }
 
-function splitFirstLine(text: string) {
-  const index = text.indexOf("\n");
-  return index === -1 ? [text, ""] : [text.slice(0, index), text.slice(index + 1)];
+function bashTokenKind(token: string): SyntaxKind {
+  const trimmed = token.trim();
+  if (trimmed.startsWith("#")) return "comment";
+  if (trimmed.startsWith("$")) return "command";
+  if (/^["']/.test(trimmed)) return "string";
+  if (trimmed.startsWith("-")) return "flag";
+  if (trimmed.startsWith("/")) return "path";
+  return "keyword";
+}
+
+function highlightWith(
+  code: string,
+  pattern: RegExp,
+  classify: (token: string, index: number, source: string) => SyntaxKind,
+) {
+  const nodes: ReactNode[] = [];
+  let offset = 0;
+
+  for (const match of code.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    if (index > offset) nodes.push(code.slice(offset, index));
+
+    const token = match[0];
+    nodes.push(
+      <span key={`${index}-${token.length}`} className={syntaxClass[classify(token, index, code)]}>
+        {token}
+      </span>,
+    );
+    offset = index + token.length;
+  }
+
+  if (offset < code.length) nodes.push(code.slice(offset));
+  return nodes.length ? nodes : [code];
 }
 
 type MessageBubbleProps = {
@@ -552,8 +644,8 @@ function MessageBubble({ label, tone, message, compact }: MessageBubbleProps) {
         : "border-border bg-white";
 
   return (
-    <article className={`rounded-lg border ${toneClass} ${compact ? "p-3" : "p-4"}`}>
-      <div className="mb-2 flex items-center gap-2">
+    <article className={`rounded-md border ${toneClass} ${compact ? "p-2" : "p-2.5"}`}>
+      <div className="mb-1 flex items-center gap-2">
         <Circle
           aria-hidden="true"
           size={8}
@@ -565,11 +657,11 @@ function MessageBubble({ label, tone, message, compact }: MessageBubbleProps) {
                 : "fill-muted text-muted"
           }
         />
-        <p className="font-mono text-xs uppercase text-muted">{label}</p>
+        <p className="font-mono text-[11px] uppercase text-muted">{label}</p>
       </div>
       <p
         className={
-          compact ? "whitespace-pre-wrap text-sm leading-6" : "whitespace-pre-wrap text-base leading-7"
+          compact ? "whitespace-pre-wrap text-sm leading-5" : "whitespace-pre-wrap text-sm leading-6"
         }
       >
         {message}
