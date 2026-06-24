@@ -19,6 +19,20 @@ type RecentRun = {
 const listRuns = makeFunctionReference<"query", Record<string, never>, RecentRun[]>("runs:list");
 
 export function DashboardView() {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
+    return <DashboardContent runs={null} />;
+  }
+
+  return <DashboardWithRuns />;
+}
+
+function DashboardWithRuns() {
+  const runs = useQuery(listRuns, {});
+
+  return <DashboardContent runs={runs} />;
+}
+
+function DashboardContent({ runs }: { runs: RecentRun[] | undefined | null }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-6 py-8">
       <header className="flex flex-col gap-3 border-b border-border pb-6">
@@ -50,6 +64,12 @@ export function DashboardView() {
               <div>
                 <h2 className="text-lg font-semibold">{scenario.title}</h2>
                 <p className="mt-2 text-sm leading-6 text-muted">{scenario.description}</p>
+                {runs !== null ? (
+                  <ScenarioRunSummary
+                    run={runs?.find((run) => run.scenarioId === scenario.id)}
+                    isLoading={runs === undefined}
+                  />
+                ) : null}
               </div>
               <span className="rounded-md border border-border px-2 py-1 font-mono text-xs text-muted">
                 {scenario.canaries.length} canary
@@ -72,22 +92,35 @@ export function DashboardView() {
           <span>Canary</span>
           <span>Score</span>
         </div>
-        <RecentRunsSection />
+        <RecentRunsSection runs={runs} />
       </section>
     </main>
   );
 }
 
-function RecentRunsSection() {
-  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
-    return <div className="px-5 py-8 text-sm text-muted">Convex is not configured.</div>;
+function ScenarioRunSummary({ run, isLoading }: { run?: RecentRun; isLoading: boolean }) {
+  if (isLoading) {
+    return <p className="mt-4 font-mono text-xs text-muted">Loading latest run...</p>;
   }
 
-  return <RecentRunsList />;
+  if (!run) {
+    return <p className="mt-4 font-mono text-xs text-muted">No runs yet</p>;
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted">
+      <span className="capitalize">{run.status}</span>
+      <span>{formatSystemPromptMode(run.systemPromptMode)}</span>
+      <span>{run.canaryTriggered ? "Canary triggered" : "Canary clear"}</span>
+      <span>Score {formatScore(run.score)}</span>
+    </div>
+  );
 }
 
-function RecentRunsList() {
-  const runs = useQuery(listRuns, {});
+function RecentRunsSection({ runs }: { runs: RecentRun[] | undefined | null }) {
+  if (runs === null) {
+    return <div className="px-5 py-8 text-sm text-muted">Convex is not configured.</div>;
+  }
 
   if (runs === undefined) {
     return <div className="px-5 py-8 text-sm text-muted">Loading runs...</div>;
@@ -113,7 +146,7 @@ function RecentRunsList() {
           <span>{formatSystemPromptMode(run.systemPromptMode)}</span>
           <span className="capitalize">{run.status}</span>
           <span>{run.canaryTriggered ? "Triggered" : "Clear"}</span>
-          <span>{run.score === undefined ? "-" : run.score}</span>
+          <span>{formatScore(run.score)}</span>
         </Link>
       ))}
     </div>
@@ -122,4 +155,8 @@ function RecentRunsList() {
 
 function formatSystemPromptMode(mode?: RecentRun["systemPromptMode"]) {
   return mode ? mode[0].toUpperCase() + mode.slice(1) : "-";
+}
+
+function formatScore(score?: number) {
+  return score === undefined ? "-" : score;
 }
