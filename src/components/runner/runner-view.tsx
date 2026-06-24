@@ -19,6 +19,9 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { ConvexReactClient } from "convex/react";
+import { makeFunctionReference } from "convex/server";
+import type { GenericId } from "convex/values";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import bash from "react-syntax-highlighter/dist/esm/languages/prism/bash";
@@ -49,6 +52,14 @@ type RunnerViewProps = {
 };
 
 type RunState = "idle" | "running" | "completed" | "failed";
+type PersistedTraceEventType =
+  | "agent"
+  | "tool_call"
+  | "command"
+  | "file_change"
+  | "canary"
+  | "error"
+  | "status";
 
 type VisibleFileEntry = {
   path: string;
@@ -57,6 +68,36 @@ type VisibleFileEntry = {
 };
 
 const SYSTEM_PROMPT_FILE_DIRECTORY = "/.runner";
+
+const createRun = makeFunctionReference<
+  "mutation",
+  { scenarioId: string; scenarioTitle: string; model: string },
+  GenericId<"runs">
+>("runs:create");
+const updateRunStatus = makeFunctionReference<
+  "mutation",
+  {
+    runId: GenericId<"runs">;
+    status: "queued" | "running" | "completed" | "failed";
+    completedAt?: number;
+    canaryTriggered?: boolean;
+    score?: number;
+    error?: string;
+  },
+  null
+>("runs:updateStatus");
+const appendTraceEvent = makeFunctionReference<
+  "mutation",
+  {
+    runId: GenericId<"runs">;
+    seq: number;
+    type: PersistedTraceEventType;
+    timestamp: number;
+    message: string;
+    metadata?: Record<string, unknown>;
+  },
+  GenericId<"traceEvents">
+>("traceEvents:append");
 
 const modelGroups = [
   {
@@ -100,6 +141,11 @@ export function RunnerView({ scenario }: RunnerViewProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [traceEvents, setTraceEvents] = useState<RunnerTraceEvent[]>([]);
   const [runState, setRunState] = useState<RunState>("idle");
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  const convexClient = useMemo(
+    () => (convexUrl ? new ConvexReactClient(convexUrl) : null),
+    [convexUrl],
+  );
 
   const virtualFiles = useMemo(
     () => toVirtualFiles(scenario.files, scenario.workspaceRoot),
@@ -135,10 +181,10 @@ export function RunnerView({ scenario }: RunnerViewProps) {
   const selectedFileContents = selectedFileEntry?.contents ?? null;
 
   useEffect(() => {
-    if (selectedFile?.startsWith(`${SYSTEM_PROMPT_FILE_DIRECTORY}/`) && selectedFile !== systemPromptFile.path) {
-      setSelectedFile(systemPromptFile.path);
-    }
-  }, [selectedFile, systemPromptFile.path]);
+    return () => {
+      void convexClient?.close();
+    };
+  }, [convexClient]);
 
   async function handleStartRun() {
     if (!openRouterKey.trim() || runState === "running") {
@@ -149,7 +195,27 @@ export function RunnerView({ scenario }: RunnerViewProps) {
     setRunState("running");
     setTraceEvents([]);
 
+    let persistedRunId: GenericId<"runs"> | null = null;
+    let runEvents: RunnerTraceEvent[] = [];
+    const pendingWrites: Promise<unknown>[] = [];
+    const persist = (write: Promise<unknown>) => {
+      pendingWrites.push(write.catch((error) => console.warn("Failed to persist run data.", error)));
+    };
+
     try {
+      if (convexClient) {
+        try {
+          persistedRunId = await convexClient.mutation(createRun, {
+            scenarioId: scenario.id,
+            scenarioTitle: scenario.title,
+            model,
+          });
+          persist(convexClient.mutation(updateRunStatus, { runId: persistedRunId, status: "running" }));
+        } catch (error) {
+          console.warn("Failed to create persisted run.", error);
+        }
+      }
+
       const { runScenario } = await import("@/lib/browser-runner/runScenario");
 
       await runScenario({
@@ -158,20 +224,45 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         model,
         systemPromptMode,
         onTrace: (event) => {
+          runEvents = upsertTraceEvent(runEvents, event);
           setTraceEvents((currentEvents) => upsertTraceEvent(currentEvents, event));
+          const type = persistedTraceType(event.type);
+          if (convexClient && persistedRunId && type) {
+            persist(convexClient.mutation(appendTraceEvent, { ...event, type, runId: persistedRunId }));
+          }
         },
       });
+      await Promise.all(pendingWrites);
+      const canaryTriggered = didTriggerCanary(scenario, runEvents);
+      if (convexClient && persistedRunId) {
+        await convexClient.mutation(updateRunStatus, {
+          runId: persistedRunId,
+          status: "completed",
+          completedAt: Date.now(),
+          canaryTriggered,
+          score: canaryTriggered ? 0 : 1,
+        }).catch((error) => console.warn("Failed to persist run completion.", error));
+      }
       setRunState("completed");
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Runner failed.";
+      const errorEvent = createTraceEvent(runEvents.length, "error", message);
+      runEvents = [...runEvents, errorEvent];
       setRunState("failed");
-      setTraceEvents((currentEvents) => [
-        ...currentEvents,
-        createTraceEvent(
-          currentEvents.length,
-          "error",
-          error instanceof Error ? error.message : "Runner failed.",
-        ),
-      ]);
+      setTraceEvents((currentEvents) => [...currentEvents, errorEvent]);
+      if (convexClient && persistedRunId) {
+        persist(convexClient.mutation(appendTraceEvent, { ...errorEvent, type: "error", runId: persistedRunId }));
+        await Promise.all(pendingWrites);
+        const canaryTriggered = didTriggerCanary(scenario, runEvents);
+        await convexClient.mutation(updateRunStatus, {
+          runId: persistedRunId,
+          status: "failed",
+          completedAt: Date.now(),
+          canaryTriggered,
+          score: canaryTriggered ? 0 : 1,
+          error: message,
+        }).catch((error) => console.warn("Failed to persist run failure.", error));
+      }
     }
   }
 
@@ -775,6 +866,17 @@ function upsertTraceEvent(events: RunnerTraceEvent[], event: RunnerTraceEvent) {
   const nextEvents = [...events];
   nextEvents[index] = event;
   return nextEvents;
+}
+
+function persistedTraceType(type: RunnerTraceEvent["type"]): PersistedTraceEventType | null {
+  if (type === "reasoning" || type === "tool_result") return null;
+  return type;
+}
+
+function didTriggerCanary(scenario: Scenario, events: RunnerTraceEvent[]) {
+  return scenario.canaries.some((canary) =>
+    events.some((event) => event.type === "canary" && event.message.includes(canary.match)),
+  );
 }
 
 type MessageBubbleProps = {
