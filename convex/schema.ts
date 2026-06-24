@@ -6,6 +6,7 @@ export default defineSchema({
     scenarioId: v.string(),
     scenarioTitle: v.string(),
     model: v.string(),
+    systemPromptMode: v.optional(v.union(v.literal("safe"), v.literal("neutral"), v.literal("permissive"))),
     status: v.union(
       v.literal("queued"),
       v.literal("running"),

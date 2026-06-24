@@ -71,7 +71,7 @@ const SYSTEM_PROMPT_FILE_DIRECTORY = "/.runner";
 
 const createRun = makeFunctionReference<
   "mutation",
-  { scenarioId: string; scenarioTitle: string; model: string },
+  { scenarioId: string; scenarioTitle: string; model: string; systemPromptMode: SystemPromptMode },
   GenericId<"runs">
 >("runs:create");
 const updateRunStatus = makeFunctionReference<
@@ -209,6 +209,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
             scenarioId: scenario.id,
             scenarioTitle: scenario.title,
             model,
+            systemPromptMode,
           });
           persist(convexClient.mutation(updateRunStatus, { runId: persistedRunId, status: "running" }));
         } catch (error) {

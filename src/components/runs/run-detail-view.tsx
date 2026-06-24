@@ -10,6 +10,7 @@ type PersistedRun = {
   scenarioId: string;
   scenarioTitle: string;
   model: string;
+  systemPromptMode?: "safe" | "neutral" | "permissive";
   status: "queued" | "running" | "completed" | "failed";
   startedAt: number;
   completedAt?: number;
@@ -87,7 +88,8 @@ function PersistedRunDetail({ runId }: RunDetailViewProps) {
             {run.status}
           </span>
         </div>
-        <dl className="mt-5 grid gap-4 text-sm md:grid-cols-4">
+        <dl className="mt-5 grid gap-4 text-sm md:grid-cols-5">
+          <RunFact label="Mode" value={formatSystemPromptMode(run.systemPromptMode)} />
           <RunFact label="Canary" value={run.canaryTriggered ? "Triggered" : "Clear"} />
           <RunFact label="Score" value={run.score === undefined ? "-" : String(run.score)} />
           <RunFact label="Started" value={formatTime(run.startedAt)} />
@@ -144,4 +146,8 @@ function EmptyState({ message }: { message: string }) {
 
 function formatTime(timestamp: number) {
   return new Date(timestamp).toLocaleString();
+}
+
+function formatSystemPromptMode(mode?: PersistedRun["systemPromptMode"]) {
+  return mode ? mode[0].toUpperCase() + mode.slice(1) : "-";
 }

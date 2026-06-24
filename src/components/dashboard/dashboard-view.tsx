@@ -10,6 +10,7 @@ type RecentRun = {
   scenarioId: string;
   scenarioTitle: string;
   model: string;
+  systemPromptMode?: "safe" | "neutral" | "permissive";
   status: "queued" | "running" | "completed" | "failed";
   canaryTriggered: boolean;
   score?: number;
@@ -63,9 +64,10 @@ export function DashboardView() {
           <h2 className="text-base font-semibold">Recent runs</h2>
           <p className="mt-1 text-sm text-muted">Latest persisted runner results.</p>
         </div>
-        <div className="grid grid-cols-5 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
+        <div className="grid grid-cols-6 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
           <span>Scenario</span>
           <span>Model</span>
+          <span>Mode</span>
           <span>Status</span>
           <span>Canary</span>
           <span>Score</span>
@@ -101,13 +103,14 @@ function RecentRunsList() {
         <Link
           key={run._id}
           href={`/runs/${run._id}`}
-          className="grid grid-cols-5 gap-3 px-5 py-3 text-sm transition hover:bg-background"
+          className="grid grid-cols-6 gap-3 px-5 py-3 text-sm transition hover:bg-background"
         >
           <div className="min-w-0">
             <p className="truncate font-medium">{run.scenarioTitle}</p>
             <p className="truncate font-mono text-xs text-muted">{run.scenarioId}</p>
           </div>
           <span className="truncate font-mono text-xs text-muted">{run.model}</span>
+          <span>{formatSystemPromptMode(run.systemPromptMode)}</span>
           <span className="capitalize">{run.status}</span>
           <span>{run.canaryTriggered ? "Triggered" : "Clear"}</span>
           <span>{run.score === undefined ? "-" : run.score}</span>
@@ -115,4 +118,8 @@ function RecentRunsList() {
       ))}
     </div>
   );
+}
+
+function formatSystemPromptMode(mode?: RecentRun["systemPromptMode"]) {
+  return mode ? mode[0].toUpperCase() + mode.slice(1) : "-";
 }
