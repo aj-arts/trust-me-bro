@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { makeFunctionReference } from "convex/server";
 import Link from "next/link";
+import { useState, type ReactNode } from "react";
 import { scenarios } from "@/scenarios/registry";
 
 type RecentRun = {
@@ -18,6 +19,7 @@ type RecentRun = {
 
 const listRuns = makeFunctionReference<"query", Record<string, never>, RecentRun[]>("runs:list");
 const systemPromptModes = ["safe", "neutral", "permissive"] as const;
+const runStatuses = ["queued", "running", "completed", "failed"] as const;
 
 export function DashboardView() {
   if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
@@ -86,14 +88,6 @@ function DashboardContent({ runs }: { runs: RecentRun[] | undefined | null }) {
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold">Recent runs</h2>
           <p className="mt-1 text-sm text-muted">Latest persisted runner results.</p>
-        </div>
-        <div className="grid grid-cols-6 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
-          <span>Scenario</span>
-          <span>Model</span>
-          <span>Mode</span>
-          <span>Status</span>
-          <span>Canary</span>
-          <span>Score</span>
         </div>
         <RecentRunsSection runs={runs} />
       </section>
@@ -184,6 +178,10 @@ function ScenarioRunSummary({ run, isLoading }: { run?: RecentRun; isLoading: bo
 }
 
 function RecentRunsSection({ runs }: { runs: RecentRun[] | undefined | null }) {
+  const [scenarioFilter, setScenarioFilter] = useState("all");
+  const [modeFilter, setModeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
   if (runs === null) {
     return <div className="px-5 py-8 text-sm text-muted">Convex is not configured.</div>;
   }
@@ -196,31 +194,111 @@ function RecentRunsSection({ runs }: { runs: RecentRun[] | undefined | null }) {
     return <div className="px-5 py-8 text-sm text-muted">No runs recorded yet.</div>;
   }
 
+  const scenarioOptions = Array.from(
+    new Map(runs.map((run) => [run.scenarioId, run.scenarioTitle] as const)),
+  );
+  const filteredRuns = runs.filter((run) => {
+    return (
+      (scenarioFilter === "all" || run.scenarioId === scenarioFilter) &&
+      (modeFilter === "all" || run.systemPromptMode === modeFilter) &&
+      (statusFilter === "all" || run.status === statusFilter)
+    );
+  });
+
   return (
-    <div className="divide-y divide-border">
-      {runs.map((run) => (
-        <Link
-          key={run._id}
-          href={`/runs/${run._id}`}
-          className="grid grid-cols-6 gap-3 px-5 py-3 text-sm transition hover:bg-background"
-        >
-          <div className="min-w-0">
-            <p className="truncate font-medium">{run.scenarioTitle}</p>
-            <p className="truncate font-mono text-xs text-muted">{run.scenarioId}</p>
-          </div>
-          <span className="truncate font-mono text-xs text-muted">{run.model}</span>
-          <span>{formatSystemPromptMode(run.systemPromptMode)}</span>
-          <span className="capitalize">{run.status}</span>
-          <span>{run.canaryTriggered ? "Triggered" : "Clear"}</span>
-          <span>{formatScore(run.score)}</span>
-        </Link>
-      ))}
-    </div>
+    <>
+      <div className="flex flex-wrap gap-3 border-b border-border px-5 py-3">
+        <RecentRunsFilter label="Scenario" value={scenarioFilter} onChange={setScenarioFilter}>
+          <option value="all">All scenarios</option>
+          {scenarioOptions.map(([id, title]) => (
+            <option key={id} value={id}>
+              {title}
+            </option>
+          ))}
+        </RecentRunsFilter>
+        <RecentRunsFilter label="Mode" value={modeFilter} onChange={setModeFilter}>
+          <option value="all">All modes</option>
+          {systemPromptModes.map((mode) => (
+            <option key={mode} value={mode}>
+              {formatSystemPromptMode(mode)}
+            </option>
+          ))}
+        </RecentRunsFilter>
+        <RecentRunsFilter label="Status" value={statusFilter} onChange={setStatusFilter}>
+          <option value="all">All statuses</option>
+          {runStatuses.map((status) => (
+            <option key={status} value={status}>
+              {formatStatus(status)}
+            </option>
+          ))}
+        </RecentRunsFilter>
+      </div>
+      <div className="grid grid-cols-6 border-b border-border px-5 py-3 font-mono text-xs uppercase text-muted">
+        <span>Scenario</span>
+        <span>Model</span>
+        <span>Mode</span>
+        <span>Status</span>
+        <span>Canary</span>
+        <span>Score</span>
+      </div>
+      {filteredRuns.length === 0 ? (
+        <div className="px-5 py-8 text-sm text-muted">No runs match these filters.</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {filteredRuns.map((run) => (
+            <Link
+              key={run._id}
+              href={`/runs/${run._id}`}
+              className="grid grid-cols-6 gap-3 px-5 py-3 text-sm transition hover:bg-background"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium">{run.scenarioTitle}</p>
+                <p className="truncate font-mono text-xs text-muted">{run.scenarioId}</p>
+              </div>
+              <span className="truncate font-mono text-xs text-muted">{run.model}</span>
+              <span>{formatSystemPromptMode(run.systemPromptMode)}</span>
+              <span className="capitalize">{run.status}</span>
+              <span>{run.canaryTriggered ? "Triggered" : "Clear"}</span>
+              <span>{formatScore(run.score)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function RecentRunsFilter({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-muted">
+      <span className="font-mono uppercase">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+      >
+        {children}
+      </select>
+    </label>
   );
 }
 
 function formatSystemPromptMode(mode?: RecentRun["systemPromptMode"]) {
   return mode ? mode[0].toUpperCase() + mode.slice(1) : "-";
+}
+
+function formatStatus(status: RecentRun["status"]) {
+  return status[0].toUpperCase() + status.slice(1);
 }
 
 function formatScore(score?: number) {
