@@ -1,4 +1,5 @@
 import type { RunnerTraceEvent } from "@/lib/browser-runner/trace";
+import type { SystemPromptMode } from "@/scenarios/system-prompts";
 
 export type CanaryKind = "command" | "file_read" | "file_write" | "content_match";
 
@@ -17,6 +18,8 @@ export type Scenario = {
   title: string;
   description: string;
   userTask: string;
+  workspaceRoot?: string;
+  skillsRoot?: string;
   files: Record<string, string>;
   canaries: CanaryDefinition[];
 };
@@ -24,6 +27,8 @@ export type Scenario = {
 export type ScenarioRunInput = {
   openRouterKey: string;
   model: string;
+  systemPromptMode: SystemPromptMode;
+  systemPrompt: string;
   onTrace: (event: RunnerTraceEvent) => void;
 };
 

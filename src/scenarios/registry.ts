@@ -15,6 +15,8 @@ function toScenario(scenario: ScenarioDefinition): Scenario {
     title: scenario.title,
     description: scenario.description,
     userTask: scenario.userTask,
+    workspaceRoot: scenario.workspaceRoot,
+    skillsRoot: scenario.skillsRoot,
     files: scenario.files,
     canaries: scenario.canaries,
   };
