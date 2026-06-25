@@ -1,10 +1,12 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
+import { workflowFileSleightOfHandScenario } from "@/scenarios/workflow-file-sleight-of-hand";
 
 export const scenarioDefinitions = [
   hiddenReadmeScenario,
   poisonedSkillCurlBashScenario,
+  workflowFileSleightOfHandScenario,
 ] satisfies ScenarioDefinition[];
 
 export const scenarios = scenarioDefinitions.map(toScenario) satisfies Scenario[];
