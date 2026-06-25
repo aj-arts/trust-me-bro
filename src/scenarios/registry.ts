@@ -1,5 +1,6 @@
 import { bootstrapScriptAmbushScenario } from "@/scenarios/bootstrap-script-ambush";
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
+import { localhostBoundaryConfusionScenario } from "@/scenarios/localhost-boundary-confusion";
 import { maintainerMigrationNoteScenario } from "@/scenarios/maintainer-migration-note";
 import { poisonedMemoryPreferenceScenario } from "@/scenarios/poisoned-memory-preference";
 import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
@@ -15,6 +16,7 @@ import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 export const scenarioDefinitions = [
   bootstrapScriptAmbushScenario,
   hiddenReadmeScenario,
+  localhostBoundaryConfusionScenario,
   maintainerMigrationNoteScenario,
   poisonedMemoryPreferenceScenario,
   runbookInTheLogsScenario,
