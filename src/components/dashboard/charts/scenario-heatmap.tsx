@@ -2,7 +2,7 @@
 
 import { heatmap, type HeatRow, type PromptModeId } from "@/lib/dashboard/mock-data";
 import { riskCell, riskCellInk, riskGlow } from "@/lib/dashboard/scale";
-import { pct, useTooltip } from "@/components/dashboard/ui";
+import { pct, tooltipPointForElement, useTooltip } from "@/components/dashboard/ui";
 
 export function ScenarioHeatmap({
   mode,
@@ -61,11 +61,32 @@ export function ScenarioHeatmap({
               </th>
               {row.cells.map((cell) => {
                 const hasRuns = cell.runs > 0;
+                const tooltip = (
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold">{row.model.name}</span>
+                    <span className="text-muted">{cell.scenario.title}</span>
+                    {hasRuns ? (
+                      <span className="tnum">
+                        Trigger rate{" "}
+                        <span className="font-semibold">{pct(cell.rate, 1)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted">No saved runs</span>
+                    )}
+                    <span className="tnum text-muted">
+                      {cell.runs} runs
+                    </span>
+                  </div>
+                );
 
                 return (
                 <td
                   key={cell.scenario.id}
-                  className="h-10 rounded-md text-center align-middle text-[0.8125rem] font-semibold tabular-nums transition-transform duration-150 hover:scale-[1.08]"
+                  tabIndex={0}
+                  aria-label={`${row.model.name}, ${cell.scenario.title}, ${
+                    hasRuns ? `trigger rate ${pct(cell.rate, 1)}` : "no saved runs"
+                  }, ${cell.runs} runs`}
+                  className="h-10 rounded-md text-center align-middle text-[0.8125rem] font-semibold tabular-nums outline-none transition-transform duration-150 hover:scale-[1.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   style={{
                     background: hasRuns ? riskCell(cell.rate) : "var(--surface-2)",
                     color: hasRuns ? riskCellInk(cell.rate) : "var(--muted)",
@@ -74,24 +95,12 @@ export function ScenarioHeatmap({
                         ? `0 0 14px -4px ${riskGlow(cell.rate, 0.7)}`
                         : undefined,
                   }}
+                  onFocus={(e) =>
+                    tip.show(tooltipPointForElement(e.currentTarget), tooltip)
+                  }
+                  onBlur={tip.hide}
                   onMouseMove={(e) =>
-                    tip.show(e, (
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold">{row.model.name}</span>
-                        <span className="text-muted">{cell.scenario.title}</span>
-                        {hasRuns ? (
-                          <span className="tnum">
-                            Trigger rate{" "}
-                            <span className="font-semibold">{pct(cell.rate, 1)}</span>
-                          </span>
-                        ) : (
-                          <span className="text-muted">No saved runs</span>
-                        )}
-                        <span className="tnum text-muted">
-                          {cell.runs} runs
-                        </span>
-                      </div>
-                    ))
+                    tip.show(e, tooltip)
                   }
                   onMouseLeave={tip.hide}
                 >

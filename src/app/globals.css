@@ -74,6 +74,34 @@
   );
 }
 
+:root[data-deck-theme="light"] .deck-root {
+  --background: #f4f6fa;
+  --foreground: #14161f;
+  --muted: #5c6478;
+  --muted-strong: #3b4151;
+  --panel: #ffffff;
+  --surface: #fafbfd;
+  --surface-2: #eef1f6;
+  --border: #dde2ec;
+  --border-strong: #c7cedb;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+  --accent-soft: #eef3ff;
+  --danger: #cd2f2c;
+  --success: #169a5a;
+  --warning: #d97706;
+  --ring: color-mix(in srgb, var(--accent) 45%, transparent);
+  --grid: color-mix(in srgb, var(--foreground) 10%, transparent);
+
+  color: var(--foreground);
+  background-color: var(--background);
+  background-image: radial-gradient(
+    circle at 50% -5%,
+    rgba(37, 99, 235, 0.09),
+    transparent 58%
+  );
+}
+
 .deck-label {
   font-family: var(--font-sans);
   font-size: 0.7rem;
