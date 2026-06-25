@@ -1,10 +1,12 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
+import { selfPoisoningArtefactLoopScenario } from "@/scenarios/self-poisoning-artefact-loop";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
   hiddenReadmeScenario,
   poisonedSkillCurlBashScenario,
+  selfPoisoningArtefactLoopScenario,
 ] satisfies ScenarioDefinition[];
 
 export const scenarios = scenarioDefinitions.map(toScenario) satisfies Scenario[];
