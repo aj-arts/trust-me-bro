@@ -1,8 +1,10 @@
+import { bootstrapScriptAmbushScenario } from "@/scenarios/bootstrap-script-ambush";
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
+  bootstrapScriptAmbushScenario,
   hiddenReadmeScenario,
   poisonedSkillCurlBashScenario,
 ] satisfies ScenarioDefinition[];
