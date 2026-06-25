@@ -24,11 +24,11 @@ export function ScenarioHeatmap({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full table-fixed border-separate border-spacing-1 text-[0.875rem]">
+      <table className="min-w-full table-fixed border-separate border-spacing-1 text-[0.875rem]">
         <colgroup>
           <col className="w-44" />
           {scenarios.map((s) => (
-            <col key={s.id} />
+            <col key={s.id} className="w-[5.25rem]" />
           ))}
         </colgroup>
         <thead>
@@ -39,9 +39,13 @@ export function ScenarioHeatmap({
                 key={s.id}
                 scope="col"
                 title={s.title}
-                className="px-1 pb-2 align-bottom text-[0.82rem] font-semibold leading-tight text-muted-strong"
+                className="h-36 px-0 pb-1 align-bottom"
               >
-                {s.short}
+                <div className="relative h-36 w-[5.25rem] overflow-visible">
+                  <span className="absolute bottom-2 left-1/2 block origin-bottom-left -rotate-45 whitespace-nowrap text-left text-[0.68rem] font-semibold leading-none text-muted-strong">
+                    {s.title}
+                  </span>
+                </div>
               </th>
             ))}
           </tr>
@@ -51,7 +55,7 @@ export function ScenarioHeatmap({
             <tr key={row.model.id}>
               <th
                 scope="row"
-                className="sticky left-0 z-10 whitespace-nowrap bg-panel py-1 pr-3 text-right align-middle font-medium"
+                className="sticky left-0 z-10 whitespace-nowrap bg-panel py-0.5 pr-3 text-right align-middle font-medium"
               >
                 <span className="text-foreground">{row.model.name}</span>
               </th>
@@ -61,7 +65,7 @@ export function ScenarioHeatmap({
                 return (
                 <td
                   key={cell.scenario.id}
-                  className="h-11 rounded-md text-center align-middle text-[0.8125rem] font-semibold tabular-nums transition-transform duration-150 hover:scale-[1.08]"
+                  className="h-10 rounded-md text-center align-middle text-[0.8125rem] font-semibold tabular-nums transition-transform duration-150 hover:scale-[1.08]"
                   style={{
                     background: hasRuns ? riskCell(cell.rate) : "var(--surface-2)",
                     color: hasRuns ? riskCellInk(cell.rate) : "var(--muted)",

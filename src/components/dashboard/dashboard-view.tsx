@@ -27,40 +27,20 @@ import { PromptRobustnessChart } from "@/components/dashboard/charts/prompt-robu
 import { ScenarioHeatmap } from "@/components/dashboard/charts/scenario-heatmap";
 import { ScenarioDifficultyChart } from "@/components/dashboard/charts/scenario-difficulty-chart";
 import { FloatingNav } from "@/components/floating-nav";
-import { useConvexConfigured } from "@/components/providers/convex-client-provider";
 
 function fmt(n: number): string {
   return n.toLocaleString();
 }
 
-type DataSource = "mock" | "convex";
 type DashboardData = typeof mockDashboardData;
 
 export function DashboardView() {
   const [mode, setMode] = useState<PromptModeId>(DEFAULT_PROMPT_MODE);
-  const [dataSource, setDataSource] = useState<DataSource>("mock");
-  const convexConfigured = useConvexConfigured();
-
-  if (dataSource === "convex" && convexConfigured) {
-    return (
-      <RealDashboardView
-        mode={mode}
-        onModeChange={setMode}
-        dataSource={dataSource}
-        onDataSourceChange={setDataSource}
-        convexConfigured={convexConfigured}
-      />
-    );
-  }
 
   return (
-    <DashboardShell
+    <RealDashboardView
       mode={mode}
       onModeChange={setMode}
-      dataSource={dataSource}
-      onDataSourceChange={setDataSource}
-      convexConfigured={convexConfigured}
-      data={mockDashboardData}
     />
   );
 }
@@ -68,15 +48,9 @@ export function DashboardView() {
 function RealDashboardView({
   mode,
   onModeChange,
-  dataSource,
-  onDataSourceChange,
-  convexConfigured,
 }: {
   mode: PromptModeId;
   onModeChange: (mode: PromptModeId) => void;
-  dataSource: DataSource;
-  onDataSourceChange: (source: DataSource) => void;
-  convexConfigured: boolean;
 }) {
   const savedRuns = useQuery(api.runs.listForDashboard, {});
   const data = useMemo(
@@ -88,9 +62,6 @@ function RealDashboardView({
     <DashboardShell
       mode={mode}
       onModeChange={onModeChange}
-      dataSource={dataSource}
-      onDataSourceChange={onDataSourceChange}
-      convexConfigured={convexConfigured}
       data={data}
       loading={savedRuns === undefined}
     />
@@ -100,25 +71,18 @@ function RealDashboardView({
 function DashboardShell({
   mode,
   onModeChange,
-  dataSource,
-  onDataSourceChange,
-  convexConfigured,
   data,
   loading = false,
 }: {
   mode: PromptModeId;
   onModeChange: (mode: PromptModeId) => void;
-  dataSource: DataSource;
-  onDataSourceChange: (source: DataSource) => void;
-  convexConfigured: boolean;
   data: DashboardData;
   loading?: boolean;
 }) {
   const activeMode = promptModes.find((m) => m.id === mode)!;
   const modeRuns = data.totalRuns(mode);
   const firstRunnable = runnableScenarios[0]?.id ?? "";
-  const sourceLabel =
-    dataSource === "mock" ? "Mock data" : loading ? "Loading Convex" : "Convex data";
+  const sourceLabel = loading ? "Loading Convex" : "Convex data";
 
   return (
     <div className="deck-root min-h-screen">
@@ -165,14 +129,6 @@ function DashboardShell({
                 <span className="hidden min-w-0 max-w-xl flex-1 truncate text-[0.95rem] leading-6 text-muted lg:block">
                   {activeMode.description}
                 </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="deck-label text-muted-strong">Data</span>
-                <DataSourceToggle
-                  value={dataSource}
-                  onChange={onDataSourceChange}
-                  convexConfigured={convexConfigured}
-                />
               </div>
               <span className="rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-[0.68rem] uppercase tracking-[0.08em] text-muted">
                 {sourceLabel}
@@ -264,10 +220,7 @@ function DashboardShell({
 
             {/* Status bar */}
             <footer className="mt-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-4 text-[0.72rem] uppercase tracking-[0.08em] text-muted">
-              <span>
-                Deck ADV-INST-01 · Data source{" "}
-                {dataSource === "mock" ? "mock grid" : "Convex saved runs"} · Integrity OK
-              </span>
+              <span>Deck ADV-INST-01 · Data source Convex saved runs · Integrity OK</span>
               <Link
                 href={`/run/${firstRunnable}`}
                 className="inline-flex items-center gap-1 text-accent transition-opacity hover:opacity-80"
@@ -279,53 +232,6 @@ function DashboardShell({
           </div>
         </div>
       </TooltipBoundary>
-    </div>
-  );
-}
-
-function DataSourceToggle({
-  value,
-  onChange,
-  convexConfigured,
-}: {
-  value: DataSource;
-  onChange: (source: DataSource) => void;
-  convexConfigured: boolean;
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Dashboard data source"
-      className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5"
-    >
-      <button
-        type="button"
-        role="tab"
-        aria-selected={value === "mock"}
-        onClick={() => onChange("mock")}
-        className={`rounded-md px-2.5 py-1 text-[0.78rem] font-medium transition-colors duration-150 ${
-          value === "mock"
-            ? "bg-accent-soft text-accent shadow-[0_0_0_1px_var(--accent-soft)]"
-            : "text-muted hover:text-foreground"
-        }`}
-      >
-        Mock
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={value === "convex"}
-        disabled={!convexConfigured}
-        title={convexConfigured ? "Use saved Convex runs" : "Set NEXT_PUBLIC_CONVEX_URL to use Convex data"}
-        onClick={() => onChange("convex")}
-        className={`rounded-md px-2.5 py-1 text-[0.78rem] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${
-          value === "convex"
-            ? "bg-accent-soft text-accent shadow-[0_0_0_1px_var(--accent-soft)]"
-            : "text-muted hover:text-foreground"
-        }`}
-      >
-        Convex
-      </button>
     </div>
   );
 }
@@ -345,36 +251,30 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function ScenarioLibrary({ items }: { items: typeof runnableScenarios }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border">
+    <div className="overflow-hidden rounded-xl border border-border">
       {items.map((scenario) => (
         <Link
           key={scenario.id}
           href={`/run/${scenario.id}`}
-          className="group grid gap-4 border-b border-border bg-surface px-5 py-4 transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent lg:grid-cols-[minmax(220px,0.85fr)_minmax(360px,1.7fr)_auto] lg:items-center"
+          className="group grid gap-x-4 gap-y-1 border-b border-border bg-surface px-4 py-2 transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent lg:grid-cols-[minmax(220px,0.8fr)_minmax(360px,1.6fr)_auto] lg:items-center"
         >
           <div className="min-w-0">
-            <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
-              Scenario
-            </p>
-            <h3 className="mt-1 font-serif text-[1.28rem] font-medium leading-tight tracking-[-0.015em] text-foreground">
+            <h3 className="truncate font-serif text-base font-medium leading-tight text-foreground">
               {scenario.title}
             </h3>
-            <p className="mt-2 text-[0.82rem] text-muted">
+            <p className="mt-0.5 text-[0.72rem] text-muted">
               {Object.keys(scenario.files).length} files · {scenario.canaries.length}{" "}
               {scenario.canaries.length === 1 ? "canary" : "canaries"}
             </p>
           </div>
 
           <div className="min-w-0">
-            <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
-              What it tests
-            </p>
-            <p className="mt-1 text-[0.92rem] leading-5 text-muted">
+            <p className="truncate text-[0.8rem] leading-5 text-muted">
               {scenario.description}
             </p>
           </div>
 
-          <span className="inline-flex items-center gap-1 font-medium text-accent lg:justify-self-end">
+          <span className="inline-flex items-center gap-1 text-[0.82rem] font-medium text-accent lg:justify-self-end">
             Open
             <ArrowUpRight size={13} />
           </span>

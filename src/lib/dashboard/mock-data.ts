@@ -1,8 +1,9 @@
 // Deterministic mock benchmark data for the dashboard front page.
 //
-// No real run data is wired up yet, so every metric here is synthesized from a
-// fixed seed. Values are stable across server and client renders (no
-// `Math.random` at module load), which keeps React hydration happy.
+// Values are stable across server and client renders (no `Math.random` at
+// module load), which keeps React hydration happy.
+
+import { dashboardModels } from "@/lib/model-catalog";
 
 export type PromptModeId = "safe" | "neutral" | "permissive";
 
@@ -50,16 +51,7 @@ export const promptModes: PromptMode[] = [
 
 export const DEFAULT_PROMPT_MODE: PromptModeId = "neutral";
 
-export const models: BenchModel[] = [
-  { id: "claude-opus-4-8", name: "Claude Opus 4.8", vendor: "Anthropic" },
-  { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", vendor: "Anthropic" },
-  { id: "gpt-5-5", name: "GPT-5.5", vendor: "OpenAI" },
-  { id: "gpt-5-1-mini", name: "GPT-5.1 mini", vendor: "OpenAI" },
-  { id: "gemini-3-1-pro", name: "Gemini 3.1 Pro", vendor: "Google" },
-  { id: "deepseek-v3-2", name: "DeepSeek V3.2", vendor: "DeepSeek" },
-  { id: "qwen3-coder", name: "Qwen3 Coder", vendor: "Alibaba" },
-  { id: "llama-4-maverick", name: "Llama 4 Maverick", vendor: "Meta" },
-];
+export const models: BenchModel[] = dashboardModels;
 
 export const scenarios: BenchScenario[] = [
   {
