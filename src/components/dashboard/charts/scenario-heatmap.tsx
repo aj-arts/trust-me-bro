@@ -11,7 +11,13 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-separate border-spacing-1 text-[0.78rem]">
+      <table className="w-full table-fixed border-separate border-spacing-1 text-[0.875rem]">
+        <colgroup>
+          <col className="w-44" />
+          {scenarios.map((s) => (
+            <col key={s.id} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th className="sticky left-0 z-10 bg-panel text-left align-bottom" />
@@ -20,7 +26,7 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
                 key={s.id}
                 scope="col"
                 title={s.title}
-                className="px-1 pb-2 align-bottom text-[0.68rem] font-medium leading-tight text-muted-strong"
+                className="px-1 pb-2 align-bottom text-[0.82rem] font-semibold leading-tight text-muted-strong"
               >
                 {s.short}
               </th>
@@ -39,7 +45,7 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
               {row.cells.map((cell) => (
                 <td
                   key={cell.scenario.id}
-                  className="h-10 rounded-md text-center align-middle font-mono text-[0.72rem] font-medium tabular-nums transition-transform duration-150 hover:scale-[1.08]"
+                  className="h-11 rounded-md text-center align-middle text-[0.8125rem] font-semibold tabular-nums transition-transform duration-150 hover:scale-[1.08]"
                   style={{
                     background: riskCell(cell.rate),
                     color: riskCellInk(cell.rate),

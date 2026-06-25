@@ -36,7 +36,7 @@ export function PromptRobustnessChart() {
       y: y(s.points[s.points.length - 1].score),
     }))
     .sort((a, b) => a.y - b.y);
-  const MIN_GAP = 15;
+  const MIN_GAP = 18;
   for (let i = 1; i < labels.length; i += 1) {
     if (labels[i].y - labels[i - 1].y < MIN_GAP) {
       labels[i].y = labels[i - 1].y + MIN_GAP;
@@ -68,7 +68,7 @@ export function PromptRobustnessChart() {
             textAnchor="end"
             dominantBaseline="middle"
             className="tnum"
-            fontSize={11}
+            fontSize={12}
             fill="var(--muted)"
           >
             {pct(t)}
@@ -91,7 +91,7 @@ export function PromptRobustnessChart() {
             x={x(i)}
             y={PAD.top + PLOT_H + 22}
             textAnchor={i === 0 ? "start" : i === promptModes.length - 1 ? "middle" : "middle"}
-            fontSize={12}
+            fontSize={13}
             fontWeight={600}
             fill="var(--muted-strong)"
           >
@@ -173,8 +173,8 @@ export function PromptRobustnessChart() {
           x={x(promptModes.length - 1) + 12}
           y={l.y}
           dominantBaseline="middle"
-          fontSize={11}
-          fontWeight={hovered === l.id ? 700 : 500}
+          fontSize={13}
+          fontWeight={500}
           fill={hovered === null || hovered === l.id ? "var(--foreground)" : "var(--muted)"}
           opacity={hovered === null || hovered === l.id ? 1 : 0.4}
           style={{ transition: "opacity 0.15s ease" }}

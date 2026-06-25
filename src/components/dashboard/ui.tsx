@@ -50,10 +50,10 @@ export function ChartPanel({
         className ?? ""
       }`}
     >
-      <header className="flex flex-col gap-3 border-b border-border px-5 py-3.5 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-4 border-b border-border px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="font-mono text-[0.74rem] font-medium uppercase tracking-[0.12em] text-foreground">
+            <h2 className="font-serif text-[1.38rem] font-medium leading-tight tracking-[-0.015em] text-foreground">
               {title}
             </h2>
             {hint ? (
@@ -62,15 +62,15 @@ export function ChartPanel({
               </span>
             ) : null}
           </div>
-          <p className="mt-1.5 max-w-prose text-[0.8rem] leading-5 text-muted">
+          <p className="mt-2 max-w-prose text-[0.95rem] leading-7 text-muted">
             {subtitle}
           </p>
         </div>
         {controls ? <div className="shrink-0">{controls}</div> : null}
       </header>
-      <div className="relative flex-1 px-5 py-5">{children}</div>
+      <div className="relative flex-1 px-6 py-6">{children}</div>
       {meta ? (
-        <footer className="border-t border-border px-5 py-2.5 font-mono text-[0.68rem] tracking-[0.04em] text-muted">
+        <footer className="border-t border-border px-6 py-3 text-[0.82rem] text-muted">
           {meta}
         </footer>
       ) : null}
@@ -96,7 +96,7 @@ export function PromptModeToggle({
   idBase = "mode",
 }: PromptModeToggleProps) {
   const pad =
-    size === "sm" ? "px-2.5 py-1 text-[0.66rem]" : "px-3.5 py-1.5 text-[0.7rem]";
+    size === "sm" ? "px-2 py-0.5 text-[0.72rem]" : "px-2.5 py-1 text-[0.78rem]";
   return (
     <div
       role="tablist"
@@ -113,7 +113,7 @@ export function PromptModeToggle({
             aria-selected={active}
             title={mode.description}
             onClick={() => onChange(mode.id)}
-            className={`rounded-md font-mono uppercase tracking-[0.08em] transition-colors duration-150 ${pad} ${
+            className={`rounded-md font-medium transition-colors duration-150 ${pad} ${
               active
                 ? "bg-accent-soft text-accent shadow-[0_0_0_1px_var(--accent-soft)]"
                 : "text-muted hover:text-foreground"
@@ -139,7 +139,7 @@ export function RiskLegend({
   highLabel: string;
 }) {
   return (
-    <div className="flex items-center gap-2 font-mono text-[0.66rem] uppercase tracking-[0.06em] text-muted">
+    <div className="flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.05em] text-muted">
       <span>{lowLabel}</span>
       <span
         aria-hidden

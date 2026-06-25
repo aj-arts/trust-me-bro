@@ -3,7 +3,6 @@
 import {
   Bot,
   Brain,
-  ChevronLeft,
   CheckCircle2,
   CircleCheckBig,
   Circle,
@@ -19,7 +18,6 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import bash from "react-syntax-highlighter/dist/esm/languages/prism/bash";
 import json from "react-syntax-highlighter/dist/esm/languages/prism/json";
@@ -29,6 +27,7 @@ import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typesc
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
+import { FloatingNav } from "@/components/floating-nav";
 import {
   buildRunnerSystemPrompt,
   DEFAULT_SYSTEM_PROMPT_MODE,
@@ -176,7 +175,16 @@ export function RunnerView({ scenario }: RunnerViewProps) {
   }
 
   return (
-    <main className="deck-root min-h-screen bg-background text-foreground">
+    <main className="deck-root relative min-h-screen bg-background text-foreground">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30">
+        <div className="mx-auto w-full max-w-[1500px] px-5 sm:px-8">
+          <FloatingNav
+            active="runner"
+            runnerHref={`/run/${scenario.id}`}
+            className="pointer-events-auto"
+          />
+        </div>
+      </div>
       <div
         className={
           selectedFile
@@ -185,16 +193,6 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         }
       >
         <aside className="flex min-h-0 flex-col border-r border-border bg-surface">
-          <div className="border-b border-border px-4 py-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-foreground"
-            >
-              <ChevronLeft aria-hidden="true" size={16} />
-              Dashboard
-            </Link>
-          </div>
-
           <div className="min-h-0 flex-1 overflow-y-auto">
             <section className="border-b border-border px-4 py-4">
               <p className="font-mono text-xs uppercase text-muted">{scenario.id}</p>
@@ -426,7 +424,7 @@ function FileEditor({
 }: FileEditorProps) {
   return (
     <div className="flex h-full min-h-[520px] flex-col xl:min-h-0">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+      <header className="flex h-20 shrink-0 items-center justify-between border-b border-border bg-surface px-4 pt-8">
         <div className="flex min-w-0 items-center gap-2">
           <FileText aria-hidden="true" size={16} className="shrink-0 text-muted" />
           <span className="truncate font-mono text-sm font-medium">{path}</span>
@@ -508,7 +506,12 @@ type TraceConversationProps = {
   density: "roomy" | "compact";
 };
 
-function TraceConversation({ scenario, events, runState, density }: TraceConversationProps) {
+function TraceConversation({
+  scenario,
+  events,
+  runState,
+  density,
+}: TraceConversationProps) {
   const compact = density === "compact";
   const visibleEvents = events.filter((event) => event.type !== "status" && event.type !== "tool_call");
   const latestEvent = visibleEvents.at(-1);
@@ -521,7 +524,7 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
 
   return (
     <div className="flex h-full min-h-[520px] flex-col xl:min-h-0">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+      <header className="flex h-20 shrink-0 items-center justify-between border-b border-border bg-surface px-4 pt-8">
         <div className="flex min-w-0 items-center gap-2">
           <Bot aria-hidden="true" size={17} className="shrink-0 text-muted" />
           <div className="min-w-0">

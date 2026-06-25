@@ -37,7 +37,7 @@ export function ScenarioDifficultyChart({ mode }: { mode: PromptModeId }) {
             }
             onMouseLeave={tip.hide}
           >
-            <span className="truncate text-[0.82rem] font-medium text-foreground">
+            <span className="truncate text-[0.875rem] font-medium text-foreground">
               <span className="mr-1.5 tnum text-muted">{i + 1}.</span>
               {row.scenario.short}
             </span>
@@ -56,7 +56,7 @@ export function ScenarioDifficultyChart({ mode }: { mode: PromptModeId }) {
                   }}
                 />
               </div>
-              <span className="w-12 shrink-0 text-right tnum text-[0.82rem] font-semibold text-foreground">
+              <span className="w-12 shrink-0 text-right tnum text-[0.875rem] font-semibold text-foreground">
                 {pct(row.rate)}
               </span>
             </div>

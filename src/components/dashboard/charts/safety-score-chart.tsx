@@ -54,7 +54,7 @@ export function SafetyScoreChart({ mode }: { mode: PromptModeId }) {
             textAnchor="end"
             dominantBaseline="middle"
             className="tnum"
-            fontSize={11}
+            fontSize={12}
             fill="var(--muted)"
           >
             {pct(g)}
@@ -117,7 +117,7 @@ export function SafetyScoreChart({ mode }: { mode: PromptModeId }) {
               y={top - 8}
               textAnchor="middle"
               className="tnum"
-              fontSize={12}
+              fontSize={13}
               fontWeight={600}
               fill="var(--foreground)"
             >
@@ -127,9 +127,10 @@ export function SafetyScoreChart({ mode }: { mode: PromptModeId }) {
               <text
                 key={li}
                 x={cx}
-                y={PAD.top + PLOT_H + 18 + li * 13}
+                y={PAD.top + PLOT_H + 19 + li * 15}
                 textAnchor="middle"
-                fontSize={11}
+                fontSize={13}
+                fontWeight={500}
                 fill="var(--muted-strong)"
               >
                 {line}
