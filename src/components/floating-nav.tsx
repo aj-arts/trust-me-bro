@@ -1,4 +1,8 @@
+"use client";
+
+import { Moon, Sun } from "lucide-react";
 import Link from "next/link";
+import { useDeckTheme } from "@/components/theme-provider";
 
 type FloatingNavProps = {
   active: "dashboard" | "runner" | "vision";
@@ -17,6 +21,8 @@ export function FloatingNav({
   variant = "floating",
   className,
 }: FloatingNavProps) {
+  const { theme, toggleTheme } = useDeckTheme();
+
   const itemClass = (isActive: boolean) =>
     variant === "inline"
       ? isActive
@@ -36,6 +42,10 @@ export function FloatingNav({
       : variant === "rail"
       ? "inline-flex items-center gap-1 rounded-full border border-border bg-surface-2 p-1"
       : "inline-flex items-center gap-1 rounded-full border border-border-strong bg-background/85 p-1 shadow-[0_18px_45px_-28px_rgba(0,0,0,0.85)] backdrop-blur";
+  const themeToggleClass =
+    variant === "inline"
+      ? "inline-flex size-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      : "inline-flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
   if (variant === "inline") {
     return (
@@ -46,6 +56,11 @@ export function FloatingNav({
           runnerHref={runnerHref}
           visionHref={visionHref}
           itemClass={itemClass}
+        />
+        <ThemeToggle
+          theme={theme}
+          onToggle={toggleTheme}
+          className={themeToggleClass}
         />
       </div>
     );
@@ -63,6 +78,11 @@ export function FloatingNav({
               visionHref={visionHref}
               itemClass={itemClass}
             />
+            <ThemeToggle
+              theme={theme}
+              onToggle={toggleTheme}
+              className={themeToggleClass}
+            />
           </div>
         </div>
       </nav>
@@ -78,6 +98,11 @@ export function FloatingNav({
           runnerHref={runnerHref}
           visionHref={visionHref}
           itemClass={itemClass}
+        />
+        <ThemeToggle
+          theme={theme}
+          onToggle={toggleTheme}
+          className={themeToggleClass}
         />
       </div>
     </nav>
@@ -123,5 +148,29 @@ function NavLinks({
         The Vision
       </Link>
     </>
+  );
+}
+
+function ThemeToggle({
+  theme,
+  onToggle,
+  className,
+}: {
+  theme: "dark" | "light";
+  onToggle: () => void;
+  className: string;
+}) {
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      type="button"
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      onClick={onToggle}
+      className={className}
+    >
+      {isDark ? <Sun aria-hidden="true" size={16} /> : <Moon aria-hidden="true" size={16} />}
+    </button>
   );
 }

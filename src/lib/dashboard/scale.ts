@@ -55,7 +55,7 @@ export function riskColor(risk: number): string {
 
 /** Glow halo color for thermal bars/lines on the dark canvas. */
 export function riskGlow(risk: number, alpha = 0.5): string {
-  return rgbString(toRgb(risk), alpha);
+  return `color-mix(in srgb, ${rgbString(toRgb(risk), alpha)} 75%, var(--background))`;
 }
 
 /** Readable ink to sit on top of a solid riskColor fill. */
@@ -70,32 +70,16 @@ export function riskInk(risk: number): string {
  */
 export function riskCell(risk: number): string {
   const t = clamp01(risk);
-  const [r, g, b] = toRgb(t);
-  // Darken low-risk cells toward the canvas so they recede.
-  const k = 0.34 + t * 0.66;
-  const base: Rgb = [22, 21, 16];
-  return rgbString([
-    Math.round(lerp(base[0], r, k)),
-    Math.round(lerp(base[1], g, k)),
-    Math.round(lerp(base[2], b, k)),
-  ]);
+  const mixAmount = Math.round(28 + t * 52);
+  return `color-mix(in srgb, ${riskColor(t)} ${mixAmount}%, var(--surface))`;
 }
 
 /** Readable ink on top of a riskCell fill. */
 export function riskCellInk(risk: number): string {
-  const t = clamp01(risk);
-  const [r, g, b] = toRgb(t);
-  const k = 0.34 + t * 0.66;
-  const base: Rgb = [22, 21, 16];
-  const composited: Rgb = [
-    Math.round(lerp(base[0], r, k)),
-    Math.round(lerp(base[1], g, k)),
-    Math.round(lerp(base[2], b, k)),
-  ];
-  return luminance(composited) > 0.45 ? "#0d0c0a" : "#edeee9";
+  return risk < 0.72 ? "var(--foreground)" : riskInk(risk);
 }
 
 /** Soft tint for backgrounds / tracks behind a risk value. */
 export function riskTint(risk: number, alpha = 0.16): string {
-  return rgbString(toRgb(risk), alpha);
+  return `color-mix(in srgb, ${rgbString(toRgb(risk), alpha)} 65%, var(--surface))`;
 }
