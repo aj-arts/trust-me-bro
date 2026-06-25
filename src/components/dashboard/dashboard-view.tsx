@@ -219,8 +219,7 @@ function DashboardShell({
             </div>
 
             {/* Status bar */}
-            <footer className="mt-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-4 text-[0.72rem] uppercase tracking-[0.08em] text-muted">
-              <span>Deck ADV-INST-01 · Data source Convex saved runs · Integrity OK</span>
+            <footer className="mt-8 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 border-t border-border pt-4 text-[0.72rem] uppercase tracking-[0.08em] text-muted">
               <Link
                 href={`/run/${firstRunnable}`}
                 className="inline-flex items-center gap-1 text-accent transition-opacity hover:opacity-80"

@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 type FloatingNavProps = {
-  active: "dashboard" | "runner";
+  active: "dashboard" | "runner" | "vision";
   runnerHref: string;
   dashboardHref?: string;
+  visionHref?: string;
   variant?: "floating" | "rail" | "inline";
   className?: string;
 };
@@ -12,6 +13,7 @@ export function FloatingNav({
   active,
   runnerHref,
   dashboardHref = "/",
+  visionHref = "/vision",
   variant = "floating",
   className,
 }: FloatingNavProps) {
@@ -42,6 +44,7 @@ export function FloatingNav({
           active={active}
           dashboardHref={dashboardHref}
           runnerHref={runnerHref}
+          visionHref={visionHref}
           itemClass={itemClass}
         />
       </div>
@@ -57,6 +60,7 @@ export function FloatingNav({
               active={active}
               dashboardHref={dashboardHref}
               runnerHref={runnerHref}
+              visionHref={visionHref}
               itemClass={itemClass}
             />
           </div>
@@ -72,6 +76,7 @@ export function FloatingNav({
           active={active}
           dashboardHref={dashboardHref}
           runnerHref={runnerHref}
+          visionHref={visionHref}
           itemClass={itemClass}
         />
       </div>
@@ -80,9 +85,10 @@ export function FloatingNav({
 }
 
 type NavLinksProps = {
-  active: "dashboard" | "runner";
+  active: "dashboard" | "runner" | "vision";
   dashboardHref: string;
   runnerHref: string;
+  visionHref: string;
   itemClass: (isActive: boolean) => string;
 };
 
@@ -90,6 +96,7 @@ function NavLinks({
   active,
   dashboardHref,
   runnerHref,
+  visionHref,
   itemClass,
 }: NavLinksProps) {
   return (
@@ -107,6 +114,13 @@ function NavLinks({
         className={itemClass(active === "runner")}
       >
         Live Runner
+      </Link>
+      <Link
+        href={visionHref}
+        aria-current={active === "vision" ? "page" : undefined}
+        className={itemClass(active === "vision")}
+      >
+        The Vision
       </Link>
     </>
   );
