@@ -15,6 +15,15 @@ export function pct(value: number, digits = 0): string {
   return `${(value * 100).toFixed(digits)}%`;
 }
 
+export function tooltipPointForElement(element: Element) {
+  const rect = element.getBoundingClientRect();
+
+  return {
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top,
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Panel — an "instrument" framed module                                      */
 /* -------------------------------------------------------------------------- */

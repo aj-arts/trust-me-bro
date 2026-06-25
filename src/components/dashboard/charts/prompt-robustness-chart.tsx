@@ -7,7 +7,7 @@ import {
   type RobustnessSeries,
 } from "@/lib/dashboard/mock-data";
 import { riskColor, riskGlow } from "@/lib/dashboard/scale";
-import { pct, useTooltip } from "@/components/dashboard/ui";
+import { pct, tooltipPointForElement, useTooltip } from "@/components/dashboard/ui";
 
 const W = 880;
 const H = 420;
@@ -79,8 +79,13 @@ export function PromptRobustnessChart({
       className="w-full"
       style={{ height: "auto" }}
       role="img"
-      aria-label="Safety score across prompt modes, one line per model"
+      aria-label="Safety score across prompt modes, one line per model. Lines can be focused for safe, neutral, and unsafe mode scores."
     >
+      <title>Prompt robustness by model</title>
+      <desc>
+        Line chart showing each model&apos;s safety score across safe, neutral, and
+        unsafe prompt modes. Focus a line to inspect exact scores.
+      </desc>
       {ticks.map((t) => (
         <g key={t}>
           <line
@@ -141,40 +146,57 @@ export function PromptRobustnessChart({
           .map((p, i) => (p.score === null ? null : `${x(i)},${y(p.score)}`))
           .filter((point): point is string => point !== null);
         if (points.length === 0) return null;
+        const tooltip = (
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">{s.model.name}</span>
+            {s.points.map((p) => (
+              <span key={p.mode} className="tnum text-muted">
+                {promptModes.find((m) => m.id === p.mode)?.label}:{" "}
+                <span className="font-semibold text-foreground">
+                  {p.score === null ? "No data" : pct(p.score, 1)}
+                </span>
+              </span>
+            ))}
+            {s.points[0].score !== null && s.points[2].score !== null ? (
+              <span className="tnum text-muted">
+                Safe → Unsafe drop{" "}
+                <span className="font-semibold text-danger">
+                  {pct(s.points[0].score - s.points[2].score, 1)}
+                </span>
+              </span>
+            ) : null}
+          </div>
+        );
+        const ariaScores = s.points
+          .map((p) => {
+            const label = promptModes.find((m) => m.id === p.mode)?.label ?? p.mode;
+            return `${label} ${p.score === null ? "no data" : pct(p.score, 1)}`;
+          })
+          .join(", ");
 
         return (
           <g
             key={s.model.id}
+            tabIndex={0}
+            role="listitem"
+            aria-label={`${s.model.name} prompt robustness, ${ariaScores}`}
             opacity={dim ? 0.18 : 1}
+            className="tmb-chart-item"
             style={{ transition: "opacity 0.15s ease" }}
+            onFocus={(e) => {
+              setHovered(s.model.id);
+              tip.show(tooltipPointForElement(e.currentTarget), tooltip);
+            }}
+            onBlur={() => {
+              setHovered(null);
+              tip.hide();
+            }}
             onMouseEnter={() => setHovered(s.model.id)}
             onMouseLeave={() => {
               setHovered(null);
               tip.hide();
             }}
-            onMouseMove={(e) =>
-              tip.show(e, (
-                <div className="flex flex-col gap-1">
-                  <span className="font-semibold">{s.model.name}</span>
-                  {s.points.map((p) => (
-                    <span key={p.mode} className="tnum text-muted">
-                      {promptModes.find((m) => m.id === p.mode)?.label}:{" "}
-                      <span className="font-semibold text-foreground">
-                        {p.score === null ? "No data" : pct(p.score, 1)}
-                      </span>
-                    </span>
-                  ))}
-                  {s.points[0].score !== null && s.points[2].score !== null ? (
-                    <span className="tnum text-muted">
-                      Safe → Unsafe drop{" "}
-                      <span className="font-semibold text-danger">
-                        {pct(s.points[0].score - s.points[2].score, 1)}
-                      </span>
-                    </span>
-                  ) : null}
-                </div>
-              ))
-            }
+            onMouseMove={(e) => tip.show(e, tooltip)}
           >
             {points.length > 1 ? (
               <polyline
@@ -228,6 +250,9 @@ export function PromptRobustnessChart({
       ))}
 
       <style>{`
+        .tmb-chart-item {
+          outline: none;
+        }
         .tmb-line {
           stroke-dasharray: 1400;
           stroke-dashoffset: 1400;

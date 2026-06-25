@@ -5,7 +5,16 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
-    ignores: [".agents/**", ".next/**", "out/**", "build/**", "dist/**", "convex/_generated/**"],
+    ignores: [
+      ".agents/**",
+      ".codex/**",
+      ".cursor/**",
+      ".next/**",
+      "out/**",
+      "build/**",
+      "dist/**",
+      "convex/_generated/**",
+    ],
   },
 ];
 

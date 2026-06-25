@@ -1,9 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useId, useState } from "react";
 import { rankedSafetyScores, type ModelScore, type PromptModeId } from "@/lib/dashboard/mock-data";
 import { riskColor, riskGlow } from "@/lib/dashboard/scale";
-import { pct, useTooltip } from "@/components/dashboard/ui";
+import { pct, tooltipPointForElement, useTooltip } from "@/components/dashboard/ui";
 
 const W = 880;
 const H = 380;
@@ -30,6 +31,9 @@ export function SafetyScoreChart({
 }) {
   const data = rows;
   const tip = useTooltip();
+  const titleId = useId();
+  const descId = useId();
+  const [focusedModel, setFocusedModel] = useState<string | null>(null);
 
   if (data.length === 0) {
     return <EmptyChartMessage>No saved runs for this prompt mode.</EmptyChartMessage>;
@@ -47,8 +51,13 @@ export function SafetyScoreChart({
       className="w-full"
       style={{ height: "auto" }}
       role="img"
-      aria-label="Scenario-weighted safety score by model"
+      aria-labelledby={`${titleId} ${descId}`}
     >
+      <title id={titleId}>Scenario-weighted safety score by model</title>
+      <desc id={descId}>
+        Bar chart ranking models by safety score for the selected prompt mode.
+        Each bar can be focused for the model name, rank, score, and run count.
+      </desc>
       {GRID.map((g) => (
         <g key={g}>
           <line
@@ -79,27 +88,41 @@ export function SafetyScoreChart({
         const risk = 1 - d.score;
         const color = riskColor(risk);
         const lines = wrapName(d.model.name);
+        const tooltip = (
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">{d.model.name}</span>
+            <span className="text-muted">{d.model.vendor}</span>
+            <span className="tnum">
+              Safety score{" "}
+              <span className="font-semibold text-foreground">
+                {pct(d.score, 1)}
+              </span>
+            </span>
+            <span className="tnum text-muted">
+              Rank #{i + 1} · {d.runs.toLocaleString()} runs
+            </span>
+          </div>
+        );
 
         return (
           <g
             key={d.model.id}
-            onMouseMove={(e) =>
-              tip.show(e, (
-                <div className="flex flex-col gap-1">
-                  <span className="font-semibold">{d.model.name}</span>
-                  <span className="text-muted">{d.model.vendor}</span>
-                  <span className="tnum">
-                    Safety score{" "}
-                    <span className="font-semibold text-foreground">
-                      {pct(d.score, 1)}
-                    </span>
-                  </span>
-                  <span className="tnum text-muted">
-                    Rank #{i + 1} · {d.runs.toLocaleString()} runs
-                  </span>
-                </div>
-              ))
-            }
+            tabIndex={0}
+            role="listitem"
+            aria-label={`${d.model.name}, ${d.model.vendor}, safety score ${pct(
+              d.score,
+              1,
+            )}, rank ${i + 1}, ${d.runs.toLocaleString()} runs`}
+            className="tmb-chart-item"
+            onFocus={(e) => {
+              setFocusedModel(d.model.id);
+              tip.show(tooltipPointForElement(e.currentTarget), tooltip);
+            }}
+            onBlur={() => {
+              setFocusedModel(null);
+              tip.hide();
+            }}
+            onMouseMove={(e) => tip.show(e, tooltip)}
             onMouseLeave={tip.hide}
           >
             {/* hit area */}
@@ -110,6 +133,18 @@ export function SafetyScoreChart({
               height={PLOT_H}
               fill="transparent"
             />
+            {focusedModel === d.model.id ? (
+              <rect
+                x={cx - barW / 2 - 5}
+                y={top - 5}
+                width={barW + 10}
+                height={PAD.top + PLOT_H - top + 10}
+                rx={7}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth={2}
+              />
+            ) : null}
             <rect
               x={cx - barW / 2}
               y={top}
@@ -161,6 +196,9 @@ export function SafetyScoreChart({
       />
 
       <style>{`
+        .tmb-chart-item {
+          outline: none;
+        }
         .tmb-bar {
           transform-box: fill-box;
           transform-origin: bottom;
