@@ -47,7 +47,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="01" kicker="What we built and why">
+          <Chapter index="01" question="What did we build, and why?">
             <ChapterTitle>A benchmark for agent security.</ChapterTitle>
             <Body>
               We built repeatable scenarios that hide malicious-looking
@@ -60,7 +60,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="02" kicker="Who it is for">
+          <Chapter index="02" question="Who is this for?">
             <ChapterTitle>Teams rolling out coding agents.</ChapterTitle>
             <Body>
               Trust Me Bro is for developers, security teams, platform
@@ -72,7 +72,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="03" kicker="Business value">
+          <Chapter index="03" question="What is the business value?">
             <ChapterTitle>Trust is the adoption unlock.</ChapterTitle>
             <Body>
               Copilot-style tools create productivity value, but enterprise
@@ -85,7 +85,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="04" kicker="Why customers need it">
+          <Chapter index="04" question="Why would customers need this?">
             <ChapterTitle>It turns a scary failure mode into evidence.</ChapterTitle>
             <Body>
               Customers can compare models, prompts, and safety instructions
@@ -97,7 +97,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="05" kicker="Feasibility and demo">
+          <Chapter index="05" question="What can we show the judges?">
             <ChapterTitle>No real malware. Real signal.</ChapterTitle>
             <ChallengeList
               items={[
@@ -110,7 +110,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="06" kicker="Next steps">
+          <Chapter index="06" question="What are the next steps?">
             <ChapterTitle>From hackathon demo to continuous evaluation.</ChapterTitle>
             <FutureList
               items={[
@@ -124,7 +124,7 @@ export function VisionView() {
 
           <Rule />
 
-          <Chapter index="07" kicker="Reality anchors">
+          <Chapter index="07" question="What proves this is real and important?">
             <ChapterTitle>Grounded in the market and the risk.</ChapterTitle>
             <SourceList
               items={[
@@ -197,11 +197,11 @@ function Rule() {
 
 function Chapter({
   index,
-  kicker,
+  question,
   children,
 }: {
   index: string;
-  kicker: string;
+  question: string;
   children: ReactNode;
 }) {
   return (
@@ -211,17 +211,22 @@ function Chapter({
           {index}
         </span>
         <p className="mt-3 text-[0.78rem] font-medium uppercase tracking-[0.16em] text-muted">
-          {kicker}
+          Judging question
         </p>
       </div>
-      <div className="max-w-3xl">{children}</div>
+      <div className="max-w-4xl">
+        <p className="text-balance font-serif text-[2.35rem] font-medium leading-[1.02] tracking-[-0.025em] text-accent sm:text-[3.7rem]">
+          {question}
+        </p>
+        {children}
+      </div>
     </section>
   );
 }
 
 function ChapterTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="text-balance font-serif text-[2.1rem] font-medium leading-[1.04] tracking-[-0.025em] text-foreground sm:text-[3rem]">
+    <h2 className="mt-6 text-balance font-serif text-[1.45rem] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[1.9rem]">
       {children}
     </h2>
   );
