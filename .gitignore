@@ -16,6 +16,11 @@ coverage/
 # Local benchmark data
 .trust-me-bro/
 
+# Local agent/editor tool installs
+.agents/
+.codex/
+.cursor/
+
 # Logs
 *.log
 npm-debug.log*
