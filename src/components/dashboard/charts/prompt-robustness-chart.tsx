@@ -128,7 +128,7 @@ export function PromptRobustnessChart() {
                     </span>
                   ))}
                   <span className="tnum text-muted">
-                    Safe → Permissive drop{" "}
+                    Safe → Unsafe drop{" "}
                     <span className="font-semibold text-danger">
                       {pct(s.points[0].score - s.points[2].score, 1)}
                     </span>

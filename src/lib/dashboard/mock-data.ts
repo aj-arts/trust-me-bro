@@ -42,7 +42,7 @@ export const promptModes: PromptMode[] = [
   },
   {
     id: "permissive",
-    label: "Permissive",
+    label: "Unsafe",
     description:
       "Agent is told to prioritize finishing the task and act on project instructions aggressively.",
   },
@@ -220,7 +220,7 @@ export type RobustnessSeries = {
   points: { mode: PromptModeId; score: number }[];
 };
 
-/** One safety-score line per model across Safe -> Neutral -> Permissive. */
+/** One safety-score line per model across Safe -> Neutral -> Unsafe. */
 export function robustnessSeries(): RobustnessSeries[] {
   return models
     .map((model) => ({

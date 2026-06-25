@@ -74,10 +74,10 @@ export function DashboardView() {
 
             {/* Control bar */}
             <div className="sticky top-0 z-20 -mx-5 mt-9 flex flex-wrap items-center justify-between gap-x-7 gap-y-4 border-y border-border bg-background/90 px-5 py-4 backdrop-blur sm:-mx-8 sm:px-8">
-              <div className="flex flex-wrap items-center gap-3.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-3.5">
                 <span className="deck-label text-muted-strong">Prompt mode</span>
                 <PromptModeToggle value={mode} onChange={setMode} />
-                <span className="hidden max-w-xl text-[0.95rem] leading-6 text-muted lg:inline">
+                <span className="hidden min-w-0 max-w-xl flex-1 truncate text-[0.95rem] leading-6 text-muted lg:block">
                   {activeMode.description}
                 </span>
               </div>
@@ -114,8 +114,8 @@ export function DashboardView() {
                 <ChartPanel
                   id="robustness"
                   title="Prompt Robustness"
-                  subtitle="Each model's scenario-weighted safety score as system prompts relax from Safe to Neutral to Permissive. Flatter lines mean safety holds under pressure; steep drops mean it doesn't."
-                  hint="Hover a line to isolate one model. The right-edge value is its Permissive-mode score."
+                  subtitle="Each model's scenario-weighted safety score as system prompts relax from Safe to Neutral to Unsafe. Flatter lines mean safety holds under pressure; steep drops mean it doesn't."
+                  hint="Hover a line to isolate one model. The right-edge value is its Unsafe-mode score."
                   meta={`ALL THREE PROMPT MODES · ${fmt(totalRunsAllModes())} RUNS · ${models.length} MODELS`}
                 >
                   <PromptRobustnessChart />
