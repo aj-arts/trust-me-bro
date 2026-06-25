@@ -7,26 +7,14 @@ type ConvexClientProviderProps = {
   children: ReactNode;
 };
 
+export const CONVEX_URL = "https://veracious-fish-815.convex.cloud";
+
 const ConvexConfiguredContext = createContext(false);
 
 export function ConvexClientProvider({ children }: ConvexClientProviderProps) {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-
   const client = useMemo(() => {
-    if (!convexUrl) {
-      return null;
-    }
-
-    return new ConvexReactClient(convexUrl);
-  }, [convexUrl]);
-
-  if (!client) {
-    return (
-      <ConvexConfiguredContext.Provider value={false}>
-        {children}
-      </ConvexConfiguredContext.Provider>
-    );
-  }
+    return new ConvexReactClient(CONVEX_URL);
+  }, []);
 
   return (
     <ConvexConfiguredContext.Provider value>

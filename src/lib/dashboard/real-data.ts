@@ -1,12 +1,12 @@
 import {
   promptModes,
-  type BenchModel,
   type HeatRow,
   type ModelScore,
   type PromptModeId,
   type RobustnessSeries,
   type ScenarioDifficultyRow,
 } from "@/lib/dashboard/mock-data";
+import { modelFromId } from "@/lib/model-catalog";
 
 export type SavedRunForDashboard = {
   scenarioId: string;
@@ -184,16 +184,6 @@ function cellKey(modelId: string, scenarioId: string, mode: PromptModeId): CellK
   return `${modelId}\n${scenarioId}\n${mode}`;
 }
 
-function modelFromId(id: string): BenchModel {
-  const [vendor, name] = id.includes("/") ? id.split("/", 2) : ["", id];
-
-  return {
-    id,
-    name: titleize(name.replace(/:free$/, "")),
-    vendor: vendor ? titleize(vendor) : "Custom",
-  };
-}
-
 function shortScenarioTitle(title: string) {
   return title
     .replace(/\([^)]*\)/g, "")
@@ -202,12 +192,6 @@ function shortScenarioTitle(title: string) {
     .split(" ")
     .slice(0, 2)
     .join(" ");
-}
-
-function titleize(value: string) {
-  return value
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function lastScore(series: RobustnessSeries) {

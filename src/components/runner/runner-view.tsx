@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
   Bot,
   Brain,
@@ -31,6 +31,7 @@ import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
 import { FloatingNav } from "@/components/floating-nav";
 import { useConvexConfigured } from "@/components/providers/convex-client-provider";
+import { buildRunnerModelGroups } from "@/lib/model-catalog";
 import {
   buildRunnerSystemPrompt,
   DEFAULT_SYSTEM_PROMPT_MODE,
@@ -60,42 +61,42 @@ type VisibleFileEntry = {
 
 const SYSTEM_PROMPT_FILE_DIRECTORY = "/.runner";
 
-const modelGroups = [
-  {
-    label: "Free",
-    models: [
-      "openrouter/free",
-      "openrouter/owl-alpha",
-      "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "poolside/laguna-m.1:free",
-      "nvidia/nemotron-3-super-120b-a12b:free",
-      "openai/gpt-oss-120b:free",
-      "poolside/laguna-xs.2:free",
-      "openai/gpt-oss-20b:free",
-      "google/gemma-4-31b-it:free",
-      "nvidia/nemotron-3-nano-30b-a3b:free",
-      "cohere/north-mini-code:free",
-      "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-      "nvidia/nemotron-nano-9b-v2:free",
-      "nvidia/nemotron-nano-12b-v2-vl:free",
-      "google/gemma-4-26b-a4b-it:free",
-      "liquid/lfm-2.5-1.2b-thinking:free",
-      "qwen/qwen3-next-80b-a3b-instruct:free",
-      "meta-llama/llama-3.3-70b-instruct:free",
-      "qwen/qwen3-coder:free",
-    ],
-  },
-  {
-    label: "Paid",
-    models: [
-      "openai/gpt-4.1-mini",
-      "anthropic/claude-sonnet-4",
-      "google/gemini-2.5-flash",
-    ],
-  },
-] as const;
-
 export function RunnerView({ scenario }: RunnerViewProps) {
+  const convexConfigured = useConvexConfigured();
+
+  if (convexConfigured) {
+    return <RunnerViewWithSavedModels scenario={scenario} />;
+  }
+
+  return <RunnerViewShell scenario={scenario} convexConfigured={false} savedModelIds={[]} />;
+}
+
+function RunnerViewWithSavedModels({ scenario }: RunnerViewProps) {
+  const savedDashboardRuns = useQuery(api.runs.listForDashboard, {});
+  const savedModelIds = useMemo(
+    () => Array.from(new Set((savedDashboardRuns ?? []).map((run) => run.model))),
+    [savedDashboardRuns],
+  );
+
+  return (
+    <RunnerViewShell
+      scenario={scenario}
+      convexConfigured
+      savedModelIds={savedModelIds}
+    />
+  );
+}
+
+type RunnerViewShellProps = RunnerViewProps & {
+  convexConfigured: boolean;
+  savedModelIds: string[];
+};
+
+function RunnerViewShell({
+  scenario,
+  convexConfigured,
+  savedModelIds,
+}: RunnerViewShellProps) {
   const [openRouterKey, setOpenRouterKey] = useState("");
   const [model, setModel] = useState("openrouter/free");
   const [systemPromptMode, setSystemPromptMode] = useState(DEFAULT_SYSTEM_PROMPT_MODE);
@@ -104,7 +105,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
   const [runState, setRunState] = useState<RunState>("idle");
   const [completedAt, setCompletedAt] = useState<number | null>(null);
   const [runKey, setRunKey] = useState(0);
-  const convexConfigured = useConvexConfigured();
+  const modelGroups = useMemo(() => buildRunnerModelGroups(savedModelIds), [savedModelIds]);
 
   const virtualFiles = useMemo(
     () => toVirtualFiles(scenario.files, scenario.workspaceRoot),
@@ -270,9 +271,9 @@ export function RunnerView({ scenario }: RunnerViewProps) {
               >
                 {modelGroups.map((group) => (
                   <optgroup key={group.label} label={group.label}>
-                    {group.models.map((modelId) => (
-                      <option key={modelId} value={modelId}>
-                        {modelId}
+                    {group.models.map((modelOption) => (
+                      <option key={modelOption.id} value={modelOption.id}>
+                        {modelOption.name} ({modelOption.id})
                       </option>
                     ))}
                   </optgroup>
@@ -944,7 +945,7 @@ function SaveRunControl(props: SaveRunControlProps) {
           Save run to Convex
         </button>
         <p className="mt-2 text-xs leading-5 text-muted">
-          Set NEXT_PUBLIC_CONVEX_URL to enable saved benchmark runs.
+          Convex is unavailable in this environment.
         </p>
       </div>
     );
