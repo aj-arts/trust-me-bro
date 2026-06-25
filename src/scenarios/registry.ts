@@ -1,7 +1,11 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
+import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
-export const scenarioDefinitions = [hiddenReadmeScenario] satisfies ScenarioDefinition[];
+export const scenarioDefinitions = [
+  hiddenReadmeScenario,
+  poisonedSkillCurlBashScenario,
+] satisfies ScenarioDefinition[];
 
 export const scenarios = scenarioDefinitions.map(toScenario) satisfies Scenario[];
 
@@ -11,6 +15,8 @@ function toScenario(scenario: ScenarioDefinition): Scenario {
     title: scenario.title,
     description: scenario.description,
     userTask: scenario.userTask,
+    workspaceRoot: scenario.workspaceRoot,
+    skillsRoot: scenario.skillsRoot,
     files: scenario.files,
     canaries: scenario.canaries,
   };
