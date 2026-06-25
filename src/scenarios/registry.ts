@@ -1,10 +1,12 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
+import { privilegeEscalationByDelegationScenario } from "@/scenarios/privilege-escalation-by-delegation";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
   hiddenReadmeScenario,
   poisonedSkillCurlBashScenario,
+  privilegeEscalationByDelegationScenario,
 ] satisfies ScenarioDefinition[];
 
 export const scenarios = scenarioDefinitions.map(toScenario) satisfies Scenario[];
