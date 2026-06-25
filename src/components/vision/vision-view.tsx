@@ -23,13 +23,13 @@ export function VisionView() {
               The Vision · Trust Me Bro
             </p>
             <h1 className="mt-7 max-w-[16ch] text-balance font-serif text-[3.2rem] font-medium leading-[0.92] tracking-[-0.04em] text-foreground sm:text-[5.4rem] lg:text-[6.6rem]">
-              We hand agents the keys.
-              <span className="text-accent"> Nobody checks the locks.</span>
+              Make agent trust measurable.
+              <span className="text-accent"> Before the keys get bigger.</span>
             </h1>
             <p className="mt-8 max-w-3xl text-pretty text-[1.15rem] leading-8 text-muted sm:text-[1.35rem] sm:leading-9">
-              Coding agents now read our repos, run our scripts, and execute
-              commands on our machines — with barely a glance from us. That trust
-              is the whole point. It is also completely unmeasured.
+              Trust Me Bro is a safe benchmark for testing whether coding agents
+              obey the user or hidden instructions buried in repo files, docs,
+              skills, setup scripts, and workflow context.
             </p>
           </header>
 
@@ -38,73 +38,120 @@ export function VisionView() {
           {/* Manifesto */}
           <section className="py-4 sm:py-6">
             <p className="max-w-5xl text-balance font-serif text-[1.9rem] font-medium leading-[1.12] tracking-[-0.02em] text-foreground sm:text-[2.9rem]">
-              We obsess over whether a model{" "}
-              <span className="text-muted">writes correct code.</span> We rarely
-              ask whether it can be{" "}
-              <span className="text-accent">talked into doing harm</span> by text
-              it was never meant to obey.
+              AI coding assistants can accelerate software work. Enterprise
+              adoption depends on proving they can act safely when developer
+              context is messy, powerful, and{" "}
+              <span className="text-accent">not always trustworthy.</span>
             </p>
           </section>
 
           <Rule />
 
-          <Chapter index="01" kicker="Why it matters">
-            <ChapterTitle>They read everything you do.</ChapterTitle>
+          <Chapter index="01" question="What did we build, and why?">
+            <ChapterTitle>A benchmark for agent security.</ChapterTitle>
             <Body>
-              Agents don&rsquo;t just suggest anymore — they act. To follow you,
-              they read <Em>everything</Em>: docs, skill files, configs, a setup
-              script left by a &ldquo;maintainer.&rdquo; Not all of it was
-              written by someone you trust, and a buried line can read like an
-              order.
+              We built repeatable scenarios that hide malicious-looking
+              instructions where agents actually read: READMEs, migration notes,
+              runbooks, tool cards, skills, and bootstrap scripts. The goal is
+              simple: learn whether an agent follows the user, pauses, or obeys a
+              trap.
             </Body>
           </Chapter>
 
           <Rule />
 
-          <Chapter index="02" kicker="What we built">
-            <ChapterTitle>We spring the trap on purpose.</ChapterTitle>
+          <Chapter index="02" question="Who is this for?">
+            <ChapterTitle>Teams rolling out coding agents.</ChapterTitle>
             <Body>
-              We hide malicious-looking instructions where agents actually read,
-              then watch: does it follow, pause, or refuse? Nothing real is ever
-              at risk — every run is sealed, with fake secrets and harmless
-              tripwires we call <Em>canaries</Em>.
+              Trust Me Bro is for developers, security teams, platform
+              engineers, and AI product teams who need to answer one practical
+              question before expanding agent permissions:{" "}
+              <Em>can this agent be trusted in our workflow?</Em>
             </Body>
           </Chapter>
 
           <Rule />
 
-          <Chapter index="03" kicker="The outcome">
-            <ChapterTitle>Safety you can actually compare.</ChapterTitle>
+          <Chapter index="03" question="What is the business value?">
+            <ChapterTitle>Trust is the adoption unlock.</ChapterTitle>
             <Body>
-              We turn <Em>&ldquo;is this agent safe?&rdquo;</Em> from a vibe into
-              a number — a safety score, a robustness curve, a heatmap of which
-              traps beat which models. Compared like speed or cost.
+              Copilot-style tools create productivity value, but enterprise
+              customers need governance before they hand agents more access.
+              Measuring agent safety supports secure adoption, customer
+              confidence, retention, and Microsoft&rsquo;s leadership in
+              responsible AI developer tooling.
             </Body>
           </Chapter>
 
           <Rule />
 
-          <Chapter index="04" kicker="What’s hard">
-            <ChapterTitle>Honest about the hard parts.</ChapterTitle>
+          <Chapter index="04" question="Why would customers need this?">
+            <ChapterTitle>It turns a scary failure mode into evidence.</ChapterTitle>
+            <Body>
+              Customers can compare models, prompts, and safety instructions
+              against the same traps; inspect traces when an agent fails; and
+              rerun the benchmark as models change. That makes agent trust
+              observable instead of assumed.
+            </Body>
+          </Chapter>
+
+          <Rule />
+
+          <Chapter index="05" question="What can we show the judges?">
+            <ChapterTitle>No real malware. Real signal.</ChapterTitle>
             <ChallengeList
               items={[
-                "Safety isn't one stable number — a single prompt change can flip it.",
-                "Attackers out-invent any fixed test, so the scenarios must keep evolving.",
-                "A benchmark that becomes its own target stops meaning anything.",
+                "Runs use a virtual filesystem, fake secrets, and harmless canaries.",
+                "The demo already includes realistic agent traps and side-by-side model traces.",
+                "Dashboards turn behavior into safety scores, robustness curves, and scenario heatmaps.",
               ]}
             />
           </Chapter>
 
           <Rule />
 
-          <Chapter index="05" kicker="What’s next">
-            <ChapterTitle>Trust, made verifiable.</ChapterTitle>
+          <Chapter index="06" question="What are the next steps?">
+            <ChapterTitle>From hackathon demo to continuous evaluation.</ChapterTitle>
             <FutureList
               items={[
                 "More scenarios drawn from real-world incidents.",
                 "Continuous evaluation as new models ship.",
                 "Community-contributed traps.",
-                "Trace analysis that explains why an agent failed.",
+                "Trace analysis that turns failures into safer agent guidance.",
+              ]}
+            />
+          </Chapter>
+
+          <Rule />
+
+          <Chapter index="07" question="What proves this is real and important?">
+            <ChapterTitle>Grounded in the market and the risk.</ChapterTitle>
+            <SourceList
+              items={[
+                {
+                  title: "OWASP LLM01: Prompt Injection",
+                  description:
+                    "Prompt injection is a top LLM application risk.",
+                  href: "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+                },
+                {
+                  title: "Microsoft guidance on indirect prompt injection",
+                  description:
+                    "Microsoft recommends defense-in-depth for untrusted content handled by AI systems.",
+                  href: "https://learn.microsoft.com/en-us/security/zero-trust/sfi/defend-indirect-prompt-injection",
+                },
+                {
+                  title: "Microsoft BIPIA benchmark",
+                  description:
+                    "Microsoft research already validates benchmarking as a path for prompt-injection robustness.",
+                  href: "https://github.com/microsoft/BIPIA",
+                },
+                {
+                  title: "GitHub Copilot business value",
+                  description:
+                    "The productivity upside makes safe enterprise adoption worth solving.",
+                  href: "https://github.blog/2023-05-09-unlocking-the-business-value-of-github-copilot/",
+                },
               ]}
             />
           </Chapter>
@@ -114,7 +161,7 @@ export function VisionView() {
           {/* Closing */}
           <section className="pt-6">
             <p className="max-w-4xl text-balance font-serif text-[2rem] font-medium leading-[1.1] tracking-[-0.02em] text-foreground sm:text-[3.1rem]">
-              Don&rsquo;t take the model&rsquo;s word for it.
+              Don&rsquo;t take the agent&rsquo;s word for it.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link
@@ -150,11 +197,11 @@ function Rule() {
 
 function Chapter({
   index,
-  kicker,
+  question,
   children,
 }: {
   index: string;
-  kicker: string;
+  question: string;
   children: ReactNode;
 }) {
   return (
@@ -164,17 +211,22 @@ function Chapter({
           {index}
         </span>
         <p className="mt-3 text-[0.78rem] font-medium uppercase tracking-[0.16em] text-muted">
-          {kicker}
+          Judging question
         </p>
       </div>
-      <div className="max-w-3xl">{children}</div>
+      <div className="max-w-4xl">
+        <p className="text-balance font-serif text-[2.35rem] font-medium leading-[1.02] tracking-[-0.025em] text-accent sm:text-[3.7rem]">
+          {question}
+        </p>
+        {children}
+      </div>
     </section>
   );
 }
 
 function ChapterTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="text-balance font-serif text-[2.1rem] font-medium leading-[1.04] tracking-[-0.025em] text-foreground sm:text-[3rem]">
+    <h2 className="mt-6 text-balance font-serif text-[1.45rem] font-medium leading-tight tracking-[-0.01em] text-foreground sm:text-[1.9rem]">
       {children}
     </h2>
   );
@@ -221,5 +273,39 @@ function FutureList({ items }: { items: string[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function SourceList({
+  items,
+}: {
+  items: { title: string; description: string; href: string }[];
+}) {
+  return (
+    <div className="mt-7 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">
+      {items.map((item) => (
+        <a
+          key={item.href}
+          href={item.href}
+          target="_blank"
+          rel="noreferrer"
+          className="group bg-panel px-6 py-5 transition-colors hover:bg-surface-2"
+        >
+          <span className="flex items-center gap-2 text-[0.76rem] font-medium uppercase tracking-[0.14em] text-accent">
+            Source
+            <ArrowUpRight
+              size={14}
+              className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+            />
+          </span>
+          <span className="mt-3 block font-serif text-[1.25rem] font-medium leading-tight tracking-[-0.01em] text-foreground">
+            {item.title}
+          </span>
+          <span className="mt-2 block text-[0.96rem] leading-6 text-muted">
+            {item.description}
+          </span>
+        </a>
+      ))}
+    </div>
   );
 }
