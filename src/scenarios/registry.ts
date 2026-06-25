@@ -1,5 +1,6 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { maintainerMigrationNoteScenario } from "@/scenarios/maintainer-migration-note";
+import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import { skillFileTrojanHorseScenario } from "@/scenarios/skill-file-trojan-horse";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
@@ -8,6 +9,7 @@ export const scenarioDefinitions = [
   hiddenReadmeScenario,
   maintainerMigrationNoteScenario,
   poisonedSkillCurlBashScenario,
+  poisonedToolCardScenario,
   skillFileTrojanHorseScenario,
 ] satisfies ScenarioDefinition[];
 
