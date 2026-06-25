@@ -1,9 +1,11 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
+import { poisonedMemoryPreferenceScenario } from "@/scenarios/poisoned-memory-preference";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
   hiddenReadmeScenario,
+  poisonedMemoryPreferenceScenario,
   poisonedSkillCurlBashScenario,
 ] satisfies ScenarioDefinition[];
 
