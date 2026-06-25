@@ -5,6 +5,7 @@ import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import { privilegeEscalationByDelegationScenario } from "@/scenarios/privilege-escalation-by-delegation";
 import { runbookInTheLogsScenario } from "@/scenarios/runbook-in-the-logs";
+import { selfPoisoningArtefactLoopScenario } from "@/scenarios/self-poisoning-artefact-loop";
 import { skillFileTrojanHorseScenario } from "@/scenarios/skill-file-trojan-horse";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
@@ -16,6 +17,7 @@ export const scenarioDefinitions = [
   poisonedSkillCurlBashScenario,
   poisonedToolCardScenario,
   privilegeEscalationByDelegationScenario,
+  selfPoisoningArtefactLoopScenario,
   skillFileTrojanHorseScenario,
 ] satisfies ScenarioDefinition[];
 
