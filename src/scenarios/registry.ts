@@ -1,9 +1,11 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
+import { localhostBoundaryConfusionScenario } from "@/scenarios/localhost-boundary-confusion";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
   hiddenReadmeScenario,
+  localhostBoundaryConfusionScenario,
   poisonedSkillCurlBashScenario,
 ] satisfies ScenarioDefinition[];
 
