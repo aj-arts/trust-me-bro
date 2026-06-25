@@ -195,15 +195,21 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         <aside className="flex min-h-0 flex-col border-r border-border bg-surface">
           <div className="min-h-0 flex-1 overflow-y-auto">
             <section className="border-b border-border px-4 py-4">
-              <p className="font-mono text-xs uppercase text-muted">{scenario.id}</p>
-              <h1 className="mt-2 text-xl font-semibold">{scenario.title}</h1>
-              <p className="mt-2 text-sm leading-6 text-muted">{scenario.description}</p>
+              <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+                {scenario.id}
+              </p>
+              <h1 className="mt-2 font-serif text-[1.45rem] font-medium leading-tight tracking-[-0.015em]">
+                {scenario.title}
+              </h1>
+              <p className="mt-2 text-[0.95rem] leading-6 text-muted">{scenario.description}</p>
             </section>
 
             <section className="border-b border-border px-3 py-3">
               <div className="mb-2 flex items-center justify-between px-1">
-                <h2 className="text-xs font-semibold uppercase text-muted">Files</h2>
-                <span className="font-mono text-xs text-muted">{fileEntries.length}</span>
+                <h2 className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+                  Files
+                </h2>
+                <span className="text-xs font-medium text-muted">{fileEntries.length}</span>
               </div>
               <div className="space-y-0.5">
                 {fileEntries.map((entry) => {
@@ -224,7 +230,9 @@ export function RunnerView({ scenario }: RunnerViewProps) {
             </section>
 
             <section className="border-b border-border px-4 py-4">
-              <h2 className="text-xs font-semibold uppercase text-muted">Run setup</h2>
+              <h2 className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+                Run setup
+              </h2>
               <label
                 className="mt-4 flex items-center gap-2 text-sm font-medium"
                 htmlFor="openrouter-key"
@@ -238,7 +246,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
                 onChange={(event) => setOpenRouterKey(event.target.value)}
                 type="password"
                 placeholder="sk-or-..."
-                className="mt-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 font-mono text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
+                className="mt-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
               />
 
               <label className="mt-4 block text-sm font-medium" htmlFor="model">
@@ -469,9 +477,13 @@ function SystemPromptModeBanner({ mode, onModeChange }: SystemPromptModeBannerPr
   return (
     <div className={`border-b px-4 py-3 ${selectedStyle.banner}`}>
       <div className="mb-3 flex flex-col gap-1">
-        <p className="font-mono text-[11px] font-semibold uppercase">System prompt mode</p>
-        <p className="text-sm font-medium">{selectedMode.label}</p>
-        <p className="text-xs leading-5 opacity-80">{selectedMode.description}</p>
+        <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em]">
+          System prompt mode
+        </p>
+        <p className="font-serif text-[1.1rem] font-medium leading-tight">
+          {selectedMode.label}
+        </p>
+        <p className="text-sm leading-5 opacity-80">{selectedMode.description}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {systemPromptModes.map((option) => {
@@ -528,9 +540,11 @@ function TraceConversation({
         <div className="flex min-w-0 items-center gap-2">
           <Bot aria-hidden="true" size={17} className="shrink-0 text-muted" />
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold">Agent trace</h2>
+            <h2 className="truncate font-serif text-[1.12rem] font-medium leading-tight tracking-[-0.01em]">
+              Agent trace
+            </h2>
             {!compact ? (
-              <p className="truncate text-xs text-muted">Task prompt and runner events</p>
+              <p className="truncate text-[0.78rem] text-muted">Task prompt and runner events</p>
             ) : null}
           </div>
         </div>
@@ -614,7 +628,9 @@ function TraceEventCard({ event, compact }: TraceEventCardProps) {
           <TraceIcon type={event.type} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="mb-1 font-mono text-[11px] uppercase text-muted">{meta.label}</p>
+          <p className="mb-1 text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+            {meta.label}
+          </p>
           {body}
         </div>
       </div>
@@ -809,7 +825,9 @@ function MessageBubble({ label, tone, message, compact }: MessageBubbleProps) {
                 : "fill-muted text-muted"
           }
         />
-        <p className="font-mono text-[11px] uppercase text-muted">{label}</p>
+        <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+          {label}
+        </p>
       </div>
       <p
         className={
@@ -855,7 +873,9 @@ function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
   return (
     <>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase text-muted">Verdict</h2>
+        <h2 className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+          Verdict
+        </h2>
         <RunStatus state={runState} />
       </div>
 
@@ -863,7 +883,7 @@ function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
         <div className={`mx-auto mb-3 inline-flex size-16 items-center justify-center rounded-full ${verdict.iconBg}`}>
           <Icon aria-hidden="true" size={42} className={verdict.iconClass} />
         </div>
-        <p className="text-base font-semibold">{verdict.title}</p>
+        <p className="font-serif text-[1.28rem] font-medium leading-tight">{verdict.title}</p>
         <p className="mt-2 text-sm leading-5 opacity-85">{verdict.description}</p>
       </div>
 

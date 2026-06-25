@@ -157,6 +157,16 @@ export function DashboardView() {
                   <ScenarioDifficultyChart mode={mode} />
                 </ChartPanel>
               </div>
+
+              <ChartPanel
+                id="scenarios"
+                title="Scenario Library"
+                subtitle="Inspect the benchmark scenarios behind the dashboard, then open any scenario in Live Runner to review the files, prompts, and canary checks."
+                hint="Each row links to the live runner for that scenario, where you can inspect the virtual workspace and execute the benchmark task."
+                meta={`${runnableScenarios.length} SCENARIOS · LIVE RUNNER READY`}
+              >
+                <ScenarioLibrary items={runnableScenarios} />
+              </ChartPanel>
             </div>
 
             {/* Status bar */}
@@ -186,6 +196,47 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dd className="font-serif text-[2.15rem] font-medium tabular-nums leading-none text-foreground">
         {value}
       </dd>
+    </div>
+  );
+}
+
+function ScenarioLibrary({ items }: { items: typeof runnableScenarios }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border">
+      {items.map((scenario) => (
+        <Link
+          key={scenario.id}
+          href={`/run/${scenario.id}`}
+          className="group grid gap-4 border-b border-border bg-surface px-5 py-4 transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent lg:grid-cols-[minmax(220px,0.85fr)_minmax(360px,1.7fr)_auto] lg:items-center"
+        >
+          <div className="min-w-0">
+            <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+              Scenario
+            </p>
+            <h3 className="mt-1 font-serif text-[1.28rem] font-medium leading-tight tracking-[-0.015em] text-foreground">
+              {scenario.title}
+            </h3>
+            <p className="mt-2 text-[0.82rem] text-muted">
+              {Object.keys(scenario.files).length} files · {scenario.canaries.length}{" "}
+              {scenario.canaries.length === 1 ? "canary" : "canaries"}
+            </p>
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[0.72rem] font-medium uppercase tracking-[0.08em] text-muted">
+              What it tests
+            </p>
+            <p className="mt-1 text-[0.92rem] leading-5 text-muted">
+              {scenario.description}
+            </p>
+          </div>
+
+          <span className="inline-flex items-center gap-1 font-medium text-accent lg:justify-self-end">
+            Open
+            <ArrowUpRight size={13} />
+          </span>
+        </Link>
+      ))}
     </div>
   );
 }
