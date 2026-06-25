@@ -4,7 +4,7 @@ import {
   scenarioDifficultyRanking,
   type PromptModeId,
 } from "@/lib/dashboard/mock-data";
-import { riskColor, riskTint } from "@/lib/dashboard/scale";
+import { riskColor, riskGlow, riskTint } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
 export function ScenarioDifficultyChart({ mode }: { mode: PromptModeId }) {
@@ -51,6 +51,7 @@ export function ScenarioDifficultyChart({ mode }: { mode: PromptModeId }) {
                   style={{
                     width: `${(row.rate / maxRate) * 100}%`,
                     background: color,
+                    boxShadow: `0 0 14px -3px ${riskGlow(row.rate, 0.55)}`,
                     animationDelay: `${i * 50}ms`,
                   }}
                 />

@@ -1,7 +1,7 @@
 "use client";
 
 import { heatmap, type PromptModeId } from "@/lib/dashboard/mock-data";
-import { riskFill, riskInk } from "@/lib/dashboard/scale";
+import { riskCell, riskCellInk, riskGlow } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
 export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
@@ -39,10 +39,14 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
               {row.cells.map((cell) => (
                 <td
                   key={cell.scenario.id}
-                  className="h-10 rounded-md text-center align-middle tnum font-medium tabular-nums transition-transform duration-150 hover:scale-[1.06]"
+                  className="h-10 rounded-md text-center align-middle font-mono text-[0.72rem] font-medium tabular-nums transition-transform duration-150 hover:scale-[1.08]"
                   style={{
-                    background: riskFill(cell.rate),
-                    color: riskInk(cell.rate),
+                    background: riskCell(cell.rate),
+                    color: riskCellInk(cell.rate),
+                    boxShadow:
+                      cell.rate > 0.45
+                        ? `0 0 14px -4px ${riskGlow(cell.rate, 0.7)}`
+                        : undefined,
                   }}
                   onMouseMove={(e) =>
                     tip.show(e, (

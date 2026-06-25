@@ -27,7 +27,7 @@ import markdown from "react-syntax-highlighter/dist/esm/languages/prism/markdown
 import tsx from "react-syntax-highlighter/dist/esm/languages/prism/tsx";
 import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
-import oneLight from "react-syntax-highlighter/dist/esm/styles/prism/one-light";
+import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
 import {
   buildRunnerSystemPrompt,
@@ -176,7 +176,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7fb] text-foreground">
+    <main className="deck-root min-h-screen bg-background text-foreground">
       <div
         className={
           selectedFile
@@ -184,7 +184,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
             : "grid min-h-screen grid-cols-1 xl:h-screen xl:grid-cols-[304px_minmax(0,1fr)] xl:overflow-hidden"
         }
       >
-        <aside className="flex min-h-0 flex-col border-r border-border bg-[#fbfcff]">
+        <aside className="flex min-h-0 flex-col border-r border-border bg-surface">
           <div className="border-b border-border px-4 py-3">
             <Link
               href="/"
@@ -240,7 +240,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
                 onChange={(event) => setOpenRouterKey(event.target.value)}
                 type="password"
                 placeholder="sk-or-..."
-                className="mt-2 h-9 w-full rounded-md border border-border bg-white px-3 font-mono text-sm outline-none focus:border-accent"
+                className="mt-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 font-mono text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
               />
 
               <label className="mt-4 block text-sm font-medium" htmlFor="model">
@@ -250,7 +250,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
                 id="model"
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
-                className="mt-2 h-9 w-full rounded-md border border-border bg-white px-3 text-sm outline-none focus:border-accent"
+                className="mt-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-foreground outline-none focus:border-accent"
               >
                 {modelGroups.map((group) => (
                   <optgroup key={group.label} label={group.label}>
@@ -288,7 +288,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
           </div>
         </aside>
 
-        <section className="min-h-0 bg-white">
+        <section className="min-h-0 bg-surface">
           {selectedFileEntry && selectedFileContents !== null ? (
             <FileEditor
               path={selectedFileEntry.path}
@@ -308,7 +308,7 @@ export function RunnerView({ scenario }: RunnerViewProps) {
         </section>
 
         {selectedFile ? (
-          <aside className="min-h-0 border-l border-border bg-white">
+          <aside className="min-h-0 border-l border-border bg-surface">
             <TraceConversation
               scenario={scenario}
               events={traceEvents}
@@ -343,8 +343,8 @@ function FileTreeButton({ path, selected, systemPromptMode, onSelect }: FileTree
       ? `relative flex h-7 w-full items-center gap-1.5 rounded-md px-2 pl-3 text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-accent ${systemPromptStyle.selected}`
       : `relative flex h-7 w-full items-center gap-1.5 rounded-md px-2 pl-3 text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-accent ${systemPromptStyle.idle}`
     : selected
-      ? "flex h-7 w-full items-center gap-1.5 rounded-md bg-[#e8eefc] px-2 text-left text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      : "flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted outline-none hover:bg-[#eef2f7] hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent";
+      ? "flex h-7 w-full items-center gap-1.5 rounded-md bg-accent-soft px-2 text-left text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      : "flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted outline-none hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent";
 
   return (
     <button
@@ -384,28 +384,28 @@ const systemPromptFileStyles: Record<
   }
 > = {
   safe: {
-    accent: "bg-[#22c55e]",
-    badge: "border border-[#bbf7d0] bg-[#dcfce7] text-[#166534]",
-    banner: "border-[#bbf7d0] bg-[#f0fdf4] text-[#14532d]",
-    icon: "text-[#16a34a]",
-    idle: "border border-[#bbf7d0] bg-[#f0fdf4] text-[#14532d] hover:bg-[#dcfce7]",
-    selected: "border border-[#86efac] bg-[#dcfce7] text-[#14532d]",
+    accent: "bg-[#4ec97a]",
+    badge: "border border-[rgba(78,201,122,0.35)] bg-[rgba(78,201,122,0.16)] text-[#86e0a6]",
+    banner: "border-[rgba(78,201,122,0.28)] bg-[rgba(78,201,122,0.08)] text-[#a7ebc2]",
+    icon: "text-[#5cd488]",
+    idle: "border border-[rgba(78,201,122,0.24)] bg-[rgba(78,201,122,0.06)] text-[#a7ebc2] hover:bg-[rgba(78,201,122,0.13)]",
+    selected: "border border-[rgba(78,201,122,0.45)] bg-[rgba(78,201,122,0.18)] text-[#cdeedb]",
   },
   neutral: {
-    accent: "bg-[#3b82f6]",
-    badge: "border border-[#bfdbfe] bg-[#dbeafe] text-[#1d4ed8]",
-    banner: "border-[#bfdbfe] bg-[#eff6ff] text-[#1e3a8a]",
-    icon: "text-[#2563eb]",
-    idle: "border border-[#bfdbfe] bg-[#eff6ff] text-[#1e3a8a] hover:bg-[#dbeafe]",
-    selected: "border border-[#93c5fd] bg-[#dbeafe] text-[#1e3a8a]",
+    accent: "bg-[#34e3d0]",
+    badge: "border border-[rgba(52,227,208,0.35)] bg-[rgba(52,227,208,0.16)] text-[#6ceadb]",
+    banner: "border-[rgba(52,227,208,0.28)] bg-[rgba(52,227,208,0.08)] text-[#8fefe2]",
+    icon: "text-[#34e3d0]",
+    idle: "border border-[rgba(52,227,208,0.24)] bg-[rgba(52,227,208,0.06)] text-[#8fefe2] hover:bg-[rgba(52,227,208,0.13)]",
+    selected: "border border-[rgba(52,227,208,0.45)] bg-[rgba(52,227,208,0.18)] text-[#bdf3ec]",
   },
   permissive: {
-    accent: "bg-[#f97316]",
-    badge: "border border-[#fed7aa] bg-[#ffedd5] text-[#c2410c]",
-    banner: "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]",
-    icon: "text-[#ea580c]",
-    idle: "border border-[#fed7aa] bg-[#fff7ed] text-[#9a3412] hover:bg-[#ffedd5]",
-    selected: "border border-[#fdba74] bg-[#ffedd5] text-[#9a3412]",
+    accent: "bg-[#f0913c]",
+    badge: "border border-[rgba(240,145,60,0.4)] bg-[rgba(240,145,60,0.16)] text-[#f4ad6e]",
+    banner: "border-[rgba(240,145,60,0.3)] bg-[rgba(240,145,60,0.08)] text-[#f6bd89]",
+    icon: "text-[#f0913c]",
+    idle: "border border-[rgba(240,145,60,0.26)] bg-[rgba(240,145,60,0.06)] text-[#f6bd89] hover:bg-[rgba(240,145,60,0.13)]",
+    selected: "border border-[rgba(240,145,60,0.5)] bg-[rgba(240,145,60,0.18)] text-[#f8cfa6]",
   },
 };
 
@@ -426,7 +426,7 @@ function FileEditor({
 }: FileEditorProps) {
   return (
     <div className="flex h-full min-h-[520px] flex-col xl:min-h-0">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-[#fbfcff] px-4">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
         <div className="flex min-w-0 items-center gap-2">
           <FileText aria-hidden="true" size={16} className="shrink-0 text-muted" />
           <span className="truncate font-mono text-sm font-medium">{path}</span>
@@ -436,12 +436,12 @@ function FileEditor({
           aria-label="Close file"
           title="Close file"
           onClick={onClose}
-          className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-[#eef2f7] hover:text-foreground"
+          className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-foreground"
         >
           <X aria-hidden="true" size={16} />
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-auto bg-white">
+      <div className="min-h-0 flex-1 overflow-auto bg-surface">
         {systemPromptMode ? (
           <SystemPromptModeBanner
             mode={systemPromptMode}
@@ -521,7 +521,7 @@ function TraceConversation({ scenario, events, runState, density }: TraceConvers
 
   return (
     <div className="flex h-full min-h-[520px] flex-col xl:min-h-0">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-[#fbfcff] px-4">
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
         <div className="flex min-w-0 items-center gap-2">
           <Bot aria-hidden="true" size={17} className="shrink-0 text-muted" />
           <div className="min-w-0">
@@ -624,74 +624,74 @@ function traceMeta(event: RunnerTraceEvent) {
     case "reasoning":
       return {
         label: "Reasoning",
-        frame: "border-[#e3e8f1] bg-[#fbfcff]",
-        iconBg: "bg-[#eef2f7] text-muted",
+        frame: "border-border bg-surface",
+        iconBg: "bg-surface-2 text-muted",
         text: "whitespace-pre-wrap text-muted",
       };
     case "tool_call":
       return {
         label: "Tool Call",
-        frame: "border-[#d9dee8] bg-[#fbfdff]",
-        iconBg: "bg-[#eef2f7] text-muted",
-        text: "whitespace-pre-wrap text-[#1f2733]",
+        frame: "border-border bg-surface",
+        iconBg: "bg-surface-2 text-muted",
+        text: "whitespace-pre-wrap text-foreground",
       };
     case "tool_result":
       return {
         label: "Tool Result",
-        frame: "border-[#d4e7db] bg-[#f7fcf8]",
-        iconBg: "bg-[#e4f4e9] text-success",
-        text: "whitespace-pre-wrap text-[#1f2733]",
+        frame: "border-[rgba(78,201,122,0.28)] bg-[rgba(78,201,122,0.07)]",
+        iconBg: "bg-[rgba(78,201,122,0.16)] text-success",
+        text: "whitespace-pre-wrap text-foreground",
       };
     case "command":
       if (event.metadata?.exitCode === 0) {
         return {
           label: "Command",
-          frame: "border-[#d4e7db] bg-[#f7fcf8]",
-          iconBg: "bg-[#e4f4e9] text-success",
-          text: "whitespace-pre-wrap font-mono text-[#1f2733]",
+          frame: "border-[rgba(78,201,122,0.28)] bg-[rgba(78,201,122,0.07)]",
+          iconBg: "bg-[rgba(78,201,122,0.16)] text-success",
+          text: "whitespace-pre-wrap font-mono text-foreground",
         };
       }
       if (typeof event.metadata?.exitCode === "number") {
         return {
           label: "Command",
-          frame: "border-[#fecaca] bg-[#fff7f7]",
-          iconBg: "bg-[#fee2e2] text-danger",
-          text: "whitespace-pre-wrap font-mono text-[#1f2733]",
+          frame: "border-[rgba(240,84,74,0.32)] bg-[rgba(240,84,74,0.08)]",
+          iconBg: "bg-[rgba(240,84,74,0.18)] text-danger",
+          text: "whitespace-pre-wrap font-mono text-foreground",
         };
       }
       return {
         label: "Command",
-        frame: "border-[#d9dee8] bg-[#fbfdff]",
-        iconBg: "bg-[#eef2f7] text-muted",
-        text: "whitespace-pre-wrap font-mono text-[#1f2733]",
+        frame: "border-border bg-surface",
+        iconBg: "bg-surface-2 text-muted",
+        text: "whitespace-pre-wrap font-mono text-foreground",
       };
     case "file_change":
       return {
         label: "File Write",
-        frame: "border-[#ded8c8] bg-[#fffdf7]",
-        iconBg: "bg-[#f6eedb] text-[#8a5a13]",
-        text: "whitespace-pre-wrap text-[#1f2733]",
+        frame: "border-[rgba(245,180,30,0.3)] bg-[rgba(245,180,30,0.07)]",
+        iconBg: "bg-[rgba(245,180,30,0.16)] text-warning",
+        text: "whitespace-pre-wrap text-foreground",
       };
     case "canary":
       return {
         label: "Canary",
-        frame: "border-[#fecaca] bg-[#fff7f7]",
-        iconBg: "bg-[#fee2e2] text-danger",
+        frame: "border-[rgba(240,84,74,0.35)] bg-[rgba(240,84,74,0.09)]",
+        iconBg: "bg-[rgba(240,84,74,0.18)] text-danger",
         text: "whitespace-pre-wrap font-medium text-danger",
       };
     case "error":
       return {
         label: "Error",
-        frame: "border-[#fecaca] bg-[#fff7f7]",
-        iconBg: "bg-[#fee2e2] text-danger",
+        frame: "border-[rgba(240,84,74,0.35)] bg-[rgba(240,84,74,0.09)]",
+        iconBg: "bg-[rgba(240,84,74,0.18)] text-danger",
         text: "whitespace-pre-wrap text-danger",
       };
     default:
       return {
         label: "Assistant",
-        frame: "border-border bg-white",
-        iconBg: "bg-[#eef2f7] text-muted",
-        text: "whitespace-pre-wrap text-[#1f2733]",
+        frame: "border-border bg-surface",
+        iconBg: "bg-surface-2 text-muted",
+        text: "whitespace-pre-wrap text-foreground",
       };
   }
 }
@@ -731,15 +731,15 @@ function HighlightedCode({
   return (
     <SyntaxHighlighter
       language={language === "text" ? undefined : language}
-      style={oneLight}
+      style={oneDark}
       customStyle={{
         margin: 0,
         minHeight: isPane && fillHeight ? "100%" : undefined,
         overflowX: "auto",
-        border: isPane ? "none" : "1px solid #d9dee8",
+        border: isPane ? "none" : "1px solid rgba(237,238,233,0.1)",
         borderRadius: isPane ? 0 : 6,
-        background: isPane ? "#fff" : "#f8fafc",
-        color: "#263244",
+        background: isPane ? "#100f0c" : "#1b1a14",
+        color: "#dcddd4",
         padding: isPane ? "1.25rem" : compact ? "0.5rem" : "0.625rem",
         fontSize: compact ? "0.75rem" : "0.875rem",
         lineHeight: compact ? "1.25rem" : "1.5rem",
@@ -787,10 +787,10 @@ type MessageBubbleProps = {
 function MessageBubble({ label, tone, message, compact }: MessageBubbleProps) {
   const toneClass =
     tone === "user"
-      ? "border-[#c7d7fe] bg-[#f4f7ff]"
+      ? "border-[rgba(52,227,208,0.3)] bg-[rgba(52,227,208,0.07)]"
       : tone === "error"
-        ? "border-[#fecaca] bg-[#fff7f7]"
-        : "border-border bg-white";
+        ? "border-[rgba(240,84,74,0.32)] bg-[rgba(240,84,74,0.08)]"
+        : "border-border bg-surface";
 
   return (
     <article className={`rounded-md border ${toneClass} ${compact ? "p-2" : "p-2.5"}`}>
@@ -871,7 +871,7 @@ function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
           return (
             <div
               key={canary.id}
-              className="flex items-center justify-between gap-2 rounded-md border border-border bg-white px-2.5 py-2"
+              className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-2.5 py-2"
             >
               <p className="min-w-0 truncate text-xs font-medium">{canary.label}</p>
               <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${status.className}`}>
@@ -889,40 +889,40 @@ const canaryVerdictStyles = {
   idle: {
     title: "No run yet",
     description: "Start the scenario to test whether the model avoids the trap.",
-    frame: "border-border bg-white text-muted",
-    iconBg: "bg-[#eef2f7]",
+    frame: "border-border bg-surface text-muted",
+    iconBg: "bg-surface-2",
     iconClass: "text-muted",
     icon: Circle,
   },
   running: {
     title: "Monitoring run",
     description: "Watching for canary triggers as the trace streams.",
-    frame: "border-[#bfdbfe] bg-[#eff6ff] text-[#1e3a8a]",
-    iconBg: "bg-[#dbeafe]",
-    iconClass: "animate-spin text-[#2563eb]",
+    frame: "border-[rgba(52,227,208,0.3)] bg-[rgba(52,227,208,0.08)] text-[#8fefe2]",
+    iconBg: "bg-[rgba(52,227,208,0.16)]",
+    iconClass: "animate-spin text-accent",
     icon: Loader2,
   },
   passed: {
     title: "Passed",
     description: "The agent avoided the poisoned setup path in this run.",
-    frame: "border-[#bbf7d0] bg-[#f0fdf4] text-[#14532d]",
-    iconBg: "bg-[#dcfce7]",
-    iconClass: "text-[#16a34a]",
+    frame: "border-[rgba(78,201,122,0.3)] bg-[rgba(78,201,122,0.08)] text-[#a7ebc2]",
+    iconBg: "bg-[rgba(78,201,122,0.16)]",
+    iconClass: "text-success",
     icon: CircleCheckBig,
   },
   triggered: {
     title: "Canary triggered",
     description: "The agent executed the poisoned setup command.",
-    frame: "border-[#fecaca] bg-[#fff7f7] text-[#991b1b]",
-    iconBg: "bg-[#fee2e2]",
+    frame: "border-[rgba(240,84,74,0.35)] bg-[rgba(240,84,74,0.09)] text-[#f3a39c]",
+    iconBg: "bg-[rgba(240,84,74,0.18)]",
     iconClass: "text-danger",
     icon: TriangleAlert,
   },
   failed: {
     title: "Run failed",
     description: "The run ended before a canary verdict could be reached.",
-    frame: "border-[#fecaca] bg-[#fff7f7] text-[#991b1b]",
-    iconBg: "bg-[#fee2e2]",
+    frame: "border-[rgba(240,84,74,0.35)] bg-[rgba(240,84,74,0.09)] text-[#f3a39c]",
+    iconBg: "bg-[rgba(240,84,74,0.18)]",
     iconClass: "text-danger",
     icon: XCircle,
   },
@@ -940,27 +940,27 @@ function canaryStatusLabel({
   if (triggered) {
     return {
       label: "Triggered",
-      className: "border border-[#fecaca] bg-[#fee2e2] text-danger",
+      className: "border border-[rgba(240,84,74,0.35)] bg-[rgba(240,84,74,0.16)] text-[#f3a39c]",
     };
   }
 
   if (runState === "completed" && !canaryTriggered) {
     return {
       label: "Not triggered",
-      className: "border border-[#bbf7d0] bg-[#dcfce7] text-[#166534]",
+      className: "border border-[rgba(78,201,122,0.35)] bg-[rgba(78,201,122,0.16)] text-[#86e0a6]",
     };
   }
 
   if (runState === "running") {
     return {
       label: "Watching",
-      className: "border border-[#bfdbfe] bg-[#dbeafe] text-[#1d4ed8]",
+      className: "border border-[rgba(52,227,208,0.35)] bg-[rgba(52,227,208,0.16)] text-[#6ceadb]",
     };
   }
 
   return {
     label: "Pending",
-    className: "border border-border bg-[#f8fafc] text-muted",
+    className: "border border-border bg-surface-2 text-muted",
   };
 }
 
@@ -980,7 +980,7 @@ function RunStatus({ state }: RunStatusProps) {
   };
 
   return (
-    <span className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-muted">
+    <span className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1 text-xs font-medium text-muted">
       <span className={`size-1.5 rounded-full ${colorByState[state]}`} />
       {labelByState[state]}
     </span>

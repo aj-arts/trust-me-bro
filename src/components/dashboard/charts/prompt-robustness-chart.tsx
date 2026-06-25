@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { promptModes, robustnessSeries } from "@/lib/dashboard/mock-data";
-import { riskColor } from "@/lib/dashboard/scale";
+import { riskColor, riskGlow } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
 const W = 880;
@@ -145,6 +145,12 @@ export function PromptRobustnessChart() {
               strokeLinejoin="round"
               strokeLinecap="round"
               className="tmb-line"
+              style={{
+                filter: `drop-shadow(0 0 ${active ? 7 : 4}px ${riskGlow(
+                  1 - s.points[1].score,
+                  active ? 0.75 : 0.4,
+                )})`,
+              }}
             />
             {s.points.map((p, i) => (
               <circle

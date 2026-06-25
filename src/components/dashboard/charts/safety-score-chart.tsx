@@ -1,7 +1,7 @@
 "use client";
 
 import { rankedSafetyScores, type PromptModeId } from "@/lib/dashboard/mock-data";
-import { riskColor } from "@/lib/dashboard/scale";
+import { riskColor, riskGlow } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
 const W = 880;
@@ -104,10 +104,13 @@ export function SafetyScoreChart({ mode }: { mode: PromptModeId }) {
               y={top}
               width={barW}
               height={PAD.top + PLOT_H - top}
-              rx={5}
+              rx={4}
               fill={color}
               className="tmb-bar"
-              style={{ animationDelay: `${i * 45}ms` }}
+              style={{
+                animationDelay: `${i * 45}ms`,
+                filter: `drop-shadow(0 2px 10px ${riskGlow(risk, 0.45)})`,
+              }}
             />
             <text
               x={cx}

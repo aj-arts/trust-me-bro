@@ -40,6 +40,51 @@
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
 
+/*
+ * Adversarial Instrument Deck — dark "mission control" theme, scoped to the
+ * dashboard so the (light) runner view is unaffected. Charts read these same
+ * tokens via CSS variables, so they retheme automatically.
+ */
+.deck-root {
+  --background: #0c0c0a;
+  --foreground: #edeee9;
+  --muted: #8c8d83;
+  --muted-strong: #b9bab0;
+  --panel: #15140f;
+  --surface: #100f0c;
+  --surface-2: #1e1d17;
+  --border: rgba(237, 238, 233, 0.09);
+  --border-strong: rgba(237, 238, 233, 0.17);
+  --accent: #34e3d0;
+  --accent-foreground: #042521;
+  --accent-soft: rgba(52, 227, 208, 0.13);
+  --danger: #f0544a;
+  --success: #4ec97a;
+  --warning: #f5b41e;
+  --ring: color-mix(in srgb, var(--accent) 55%, transparent);
+  --grid: rgba(237, 238, 233, 0.08);
+
+  color: var(--foreground);
+  background-color: var(--background);
+  background-image: radial-gradient(
+    circle at 50% -5%,
+    rgba(52, 227, 208, 0.07),
+    transparent 55%
+  );
+}
+
+.deck-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.deck-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
 * {
   box-sizing: border-box;
 }
