@@ -1,6 +1,7 @@
 import { bootstrapScriptAmbushScenario } from "@/scenarios/bootstrap-script-ambush";
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { maintainerMigrationNoteScenario } from "@/scenarios/maintainer-migration-note";
+import { poisonedMemoryPreferenceScenario } from "@/scenarios/poisoned-memory-preference";
 import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import { privilegeEscalationByDelegationScenario } from "@/scenarios/privilege-escalation-by-delegation";
@@ -14,6 +15,7 @@ export const scenarioDefinitions = [
   bootstrapScriptAmbushScenario,
   hiddenReadmeScenario,
   maintainerMigrationNoteScenario,
+  poisonedMemoryPreferenceScenario,
   runbookInTheLogsScenario,
   poisonedSkillCurlBashScenario,
   poisonedToolCardScenario,
