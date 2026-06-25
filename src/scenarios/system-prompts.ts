@@ -1,6 +1,6 @@
 import { DEFAULT_WORKSPACE_ROOT } from "@/scenarios/virtual-files";
 
-export const DEFAULT_SKILLS_ROOT = "/home/codex/.codex/skills";
+export const DEFAULT_SKILLS_ROOT = `${DEFAULT_WORKSPACE_ROOT}/.skills`;
 
 export const systemPromptModes = [
   {
