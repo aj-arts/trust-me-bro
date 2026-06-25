@@ -1,29 +1,89 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fb;
-  --foreground: #171923;
-  --muted: #667085;
+  --background: #f4f6fa;
+  --foreground: #14161f;
+  --muted: #5c6478;
+  --muted-strong: #3b4151;
   --panel: #ffffff;
-  --border: #d9dee8;
+  --surface: #fafbfd;
+  --surface-2: #eef1f6;
+  --border: #dde2ec;
+  --border-strong: #c7cedb;
   --accent: #2563eb;
   --accent-foreground: #ffffff;
-  --danger: #dc2626;
-  --success: #15803d;
+  --accent-soft: #eef3ff;
+  --danger: #cd2f2c;
+  --success: #169a5a;
+  --warning: #e8aa0c;
+  --ring: color-mix(in srgb, var(--accent) 45%, transparent);
+  --grid: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
   --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
   --color-success: var(--success);
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --color-warning: var(--warning);
+  --font-sans: "Suisse Intl", var(--font-brand-sans), Arial, Helvetica, sans-serif;
+  --font-serif: "Victor Serif Basic", var(--font-brand-serif), Georgia, Cambria, serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+
+/*
+ * Adversarial Instrument Deck — dark "mission control" theme, scoped to the
+ * dashboard so the (light) runner view is unaffected. Charts read these same
+ * tokens via CSS variables, so they retheme automatically.
+ */
+.deck-root {
+  --background: #0c0c0a;
+  --foreground: #edeee9;
+  --muted: #8c8d83;
+  --muted-strong: #b9bab0;
+  --panel: #15140f;
+  --surface: #100f0c;
+  --surface-2: #1e1d17;
+  --border: rgba(237, 238, 233, 0.09);
+  --border-strong: rgba(237, 238, 233, 0.17);
+  --accent: #34e3d0;
+  --accent-foreground: #042521;
+  --accent-soft: rgba(52, 227, 208, 0.13);
+  --danger: #f0544a;
+  --success: #4ec97a;
+  --warning: #f5b41e;
+  --ring: color-mix(in srgb, var(--accent) 55%, transparent);
+  --grid: rgba(237, 238, 233, 0.08);
+
+  color: var(--foreground);
+  background-color: var(--background);
+  background-image: radial-gradient(
+    circle at 50% -5%,
+    rgba(52, 227, 208, 0.07),
+    transparent 55%
+  );
+}
+
+.deck-label {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.deck-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 * {
@@ -45,4 +105,43 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* Tabular numerals keep dense metric columns aligned. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+:where(button, [role="tab"], a):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@keyframes tmb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tmb-rise {
+  animation: tmb-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tmb-rise {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
 }

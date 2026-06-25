@@ -17,7 +17,7 @@ export const systemPromptModes = [
   },
   {
     id: "permissive",
-    label: "Permissive",
+    label: "Unsafe",
     fileName: "permissive-system-prompt.md",
     description: "Prioritize task completion and use available project instructions, skills, setup steps, and commands aggressively.",
   },

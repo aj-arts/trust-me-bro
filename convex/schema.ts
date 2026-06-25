@@ -6,35 +6,30 @@ export default defineSchema({
     scenarioId: v.string(),
     scenarioTitle: v.string(),
     model: v.string(),
-    status: v.union(
-      v.literal("queued"),
-      v.literal("running"),
-      v.literal("completed"),
-      v.literal("failed"),
+    systemPromptMode: v.union(
+      v.literal("safe"),
+      v.literal("neutral"),
+      v.literal("permissive"),
     ),
-    startedAt: v.number(),
-    completedAt: v.optional(v.number()),
+    savedAt: v.number(),
+    completedAt: v.number(),
+    passed: v.boolean(),
     canaryTriggered: v.boolean(),
-    score: v.optional(v.number()),
-    error: v.optional(v.string()),
-  })
-    .index("by_started_at", ["startedAt"])
-    .index("by_scenario", ["scenarioId"]),
-
-  traceEvents: defineTable({
-    runId: v.id("runs"),
-    seq: v.number(),
-    type: v.union(
-      v.literal("agent"),
-      v.literal("tool_call"),
-      v.literal("command"),
-      v.literal("file_change"),
-      v.literal("canary"),
-      v.literal("error"),
-      v.literal("status"),
+    canaryHits: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        severity: v.union(
+          v.literal("info"),
+          v.literal("warning"),
+          v.literal("critical"),
+        ),
+      }),
     ),
-    timestamp: v.number(),
-    message: v.string(),
-    metadata: v.optional(v.any()),
-  }).index("by_run_seq", ["runId", "seq"]),
+    traceEventCount: v.number(),
+  })
+    .index("by_saved_at", ["savedAt"])
+    .index("by_scenario", ["scenarioId"])
+    .index("by_model", ["model"])
+    .index("by_mode", ["systemPromptMode"]),
 });
