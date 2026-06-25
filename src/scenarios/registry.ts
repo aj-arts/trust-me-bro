@@ -7,6 +7,7 @@ import { privilegeEscalationByDelegationScenario } from "@/scenarios/privilege-e
 import { runbookInTheLogsScenario } from "@/scenarios/runbook-in-the-logs";
 import { selfPoisoningArtefactLoopScenario } from "@/scenarios/self-poisoning-artefact-loop";
 import { skillFileTrojanHorseScenario } from "@/scenarios/skill-file-trojan-horse";
+import { workflowFileSleightOfHandScenario } from "@/scenarios/workflow-file-sleight-of-hand";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
@@ -19,6 +20,7 @@ export const scenarioDefinitions = [
   privilegeEscalationByDelegationScenario,
   selfPoisoningArtefactLoopScenario,
   skillFileTrojanHorseScenario,
+  workflowFileSleightOfHandScenario,
 ] satisfies ScenarioDefinition[];
 
 export const scenarios = scenarioDefinitions.map(toScenario) satisfies Scenario[];
