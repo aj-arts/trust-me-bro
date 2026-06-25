@@ -1,18 +1,21 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
+import { useQuery } from "convex/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { api } from "../../../convex/_generated/api";
 import { scenarios as runnableScenarios } from "@/scenarios/registry";
 import {
   DEFAULT_PROMPT_MODE,
-  models,
+  mockDashboardData,
   promptModes,
-  scenarios,
-  totalRuns,
-  totalRunsAllModes,
   type PromptModeId,
 } from "@/lib/dashboard/mock-data";
+import {
+  buildRealDashboardData,
+  type SavedRunForDashboard,
+} from "@/lib/dashboard/real-data";
 import {
   ChartPanel,
   PromptModeToggle,
@@ -24,16 +27,98 @@ import { PromptRobustnessChart } from "@/components/dashboard/charts/prompt-robu
 import { ScenarioHeatmap } from "@/components/dashboard/charts/scenario-heatmap";
 import { ScenarioDifficultyChart } from "@/components/dashboard/charts/scenario-difficulty-chart";
 import { FloatingNav } from "@/components/floating-nav";
+import { useConvexConfigured } from "@/components/providers/convex-client-provider";
 
 function fmt(n: number): string {
   return n.toLocaleString();
 }
 
+type DataSource = "mock" | "convex";
+type DashboardData = typeof mockDashboardData;
+
 export function DashboardView() {
   const [mode, setMode] = useState<PromptModeId>(DEFAULT_PROMPT_MODE);
+  const [dataSource, setDataSource] = useState<DataSource>("mock");
+  const convexConfigured = useConvexConfigured();
+
+  if (dataSource === "convex" && convexConfigured) {
+    return (
+      <RealDashboardView
+        mode={mode}
+        onModeChange={setMode}
+        dataSource={dataSource}
+        onDataSourceChange={setDataSource}
+        convexConfigured={convexConfigured}
+      />
+    );
+  }
+
+  return (
+    <DashboardShell
+      mode={mode}
+      onModeChange={setMode}
+      dataSource={dataSource}
+      onDataSourceChange={setDataSource}
+      convexConfigured={convexConfigured}
+      data={mockDashboardData}
+    />
+  );
+}
+
+function RealDashboardView({
+  mode,
+  onModeChange,
+  dataSource,
+  onDataSourceChange,
+  convexConfigured,
+}: {
+  mode: PromptModeId;
+  onModeChange: (mode: PromptModeId) => void;
+  dataSource: DataSource;
+  onDataSourceChange: (source: DataSource) => void;
+  convexConfigured: boolean;
+}) {
+  const savedRuns = useQuery(api.runs.listForDashboard, {});
+  const data = useMemo(
+    () => buildRealDashboardData((savedRuns ?? []) as SavedRunForDashboard[]),
+    [savedRuns],
+  );
+
+  return (
+    <DashboardShell
+      mode={mode}
+      onModeChange={onModeChange}
+      dataSource={dataSource}
+      onDataSourceChange={onDataSourceChange}
+      convexConfigured={convexConfigured}
+      data={data}
+      loading={savedRuns === undefined}
+    />
+  );
+}
+
+function DashboardShell({
+  mode,
+  onModeChange,
+  dataSource,
+  onDataSourceChange,
+  convexConfigured,
+  data,
+  loading = false,
+}: {
+  mode: PromptModeId;
+  onModeChange: (mode: PromptModeId) => void;
+  dataSource: DataSource;
+  onDataSourceChange: (source: DataSource) => void;
+  convexConfigured: boolean;
+  data: DashboardData;
+  loading?: boolean;
+}) {
   const activeMode = promptModes.find((m) => m.id === mode)!;
-  const modeRuns = totalRuns(mode);
+  const modeRuns = data.totalRuns(mode);
   const firstRunnable = runnableScenarios[0]?.id ?? "";
+  const sourceLabel =
+    dataSource === "mock" ? "Mock data" : loading ? "Loading Convex" : "Convex data";
 
   return (
     <div className="deck-root min-h-screen">
@@ -64,10 +149,10 @@ export function DashboardView() {
                   </p>
                 </div>
                 <dl className="grid w-full max-w-xl shrink-0 grid-cols-2 gap-x-12 gap-y-6 rounded-[1.5rem] border border-border bg-panel px-7 py-6 sm:grid-cols-4 xl:w-[360px] xl:max-w-none xl:grid-cols-2 xl:px-8 xl:py-7">
-                  <Stat label="Models" value={fmt(models.length)} />
-                  <Stat label="Scenarios" value={fmt(scenarios.length)} />
+                  <Stat label="Models" value={fmt(data.models.length)} />
+                  <Stat label="Scenarios" value={fmt(data.scenarios.length)} />
                   <Stat label="Prompt modes" value={fmt(promptModes.length)} />
-                  <Stat label="Runs" value={fmt(totalRunsAllModes())} />
+                  <Stat label="Runs" value={loading ? "..." : fmt(data.totalRunsAllModes())} />
                 </dl>
               </div>
             </header>
@@ -76,13 +161,21 @@ export function DashboardView() {
             <div className="sticky top-0 z-20 -mx-5 mt-9 flex flex-wrap items-center justify-between gap-x-7 gap-y-4 border-y border-border bg-background/90 px-5 py-4 backdrop-blur sm:-mx-8 sm:px-8">
               <div className="flex min-w-0 flex-wrap items-center gap-3.5">
                 <span className="deck-label text-muted-strong">Prompt mode</span>
-                <PromptModeToggle value={mode} onChange={setMode} />
+                <PromptModeToggle value={mode} onChange={onModeChange} />
                 <span className="hidden min-w-0 max-w-xl flex-1 truncate text-[0.95rem] leading-6 text-muted lg:block">
                   {activeMode.description}
                 </span>
               </div>
+              <div className="flex items-center gap-3">
+                <span className="deck-label text-muted-strong">Data</span>
+                <DataSourceToggle
+                  value={dataSource}
+                  onChange={onDataSourceChange}
+                  convexConfigured={convexConfigured}
+                />
+              </div>
               <span className="rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-[0.68rem] uppercase tracking-[0.08em] text-muted">
-                Mock data
+                {sourceLabel}
               </span>
             </div>
 
@@ -95,19 +188,19 @@ export function DashboardView() {
                   subtitle="Average safety pass rate across all scenarios, counting each scenario equally. Higher is safer. Ranked for the selected prompt mode."
                   hint="Per model: mean of (1 − canary trigger rate) over every scenario, each scenario weighted equally regardless of run count."
                   controls={
-                    <PromptModeToggle value={mode} onChange={setMode} size="sm" idBase="score" />
+                    <PromptModeToggle value={mode} onChange={onModeChange} size="sm" idBase="score" />
                   }
                   meta={
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        WEIGHTED ACROSS {scenarios.length} SCENARIOS · {fmt(modeRuns)} RUNS ·{" "}
+                        WEIGHTED ACROSS {data.scenarios.length} SCENARIOS · {fmt(modeRuns)} RUNS ·{" "}
                         {activeMode.label.toUpperCase()} MODE
                       </span>
                       <RiskLegend lowLabel="Safer" highLabel="Riskier" />
                     </div>
                   }
                 >
-                  <SafetyScoreChart mode={mode} />
+                  <SafetyScoreChart mode={mode} rows={data.rankedSafetyScores(mode)} />
                 </ChartPanel>
 
                 {/* 2 — Prompt Robustness */}
@@ -116,9 +209,9 @@ export function DashboardView() {
                   title="Prompt Robustness"
                   subtitle="Each model's scenario-weighted safety score as system prompts relax from Safe to Neutral to Unsafe. Flatter lines mean safety holds under pressure; steep drops mean it doesn't."
                   hint="Hover a line to isolate one model. The right-edge value is its Unsafe-mode score."
-                  meta={`ALL THREE PROMPT MODES · ${fmt(totalRunsAllModes())} RUNS · ${models.length} MODELS`}
+                  meta={`ALL THREE PROMPT MODES · ${fmt(data.totalRunsAllModes())} RUNS · ${data.models.length} MODELS`}
                 >
-                  <PromptRobustnessChart />
+                  <PromptRobustnessChart series={data.robustnessSeries()} />
                 </ChartPanel>
               </div>
 
@@ -131,19 +224,19 @@ export function DashboardView() {
                   subtitle="Canary trigger rate per model and scenario in the selected prompt mode. Greener cells are safer, redder cells fail more often."
                   hint="Rows are models (safest at the top), columns are scenarios. Each cell is the share of runs that tripped a canary."
                   controls={
-                    <PromptModeToggle value={mode} onChange={setMode} size="sm" idBase="heat" />
+                    <PromptModeToggle value={mode} onChange={onModeChange} size="sm" idBase="heat" />
                   }
                   meta={
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        {models.length}×{scenarios.length} CELLS · {fmt(modeRuns)} RUNS ·{" "}
+                        {data.models.length}×{data.scenarios.length} CELLS · {fmt(modeRuns)} RUNS ·{" "}
                         {activeMode.label.toUpperCase()} MODE
                       </span>
                       <RiskLegend lowLabel="0%" highLabel="100%" />
                     </div>
                   }
                 >
-                  <ScenarioHeatmap mode={mode} />
+                  <ScenarioHeatmap mode={mode} rows={data.heatmap(mode)} />
                 </ChartPanel>
 
                 {/* 4 — Scenario Difficulty */}
@@ -152,9 +245,9 @@ export function DashboardView() {
                   title="Scenario Difficulty"
                   subtitle="Scenarios ranked by average canary trigger rate across all models. The traps at the top defeat the most models."
                   hint="Average of every model's trigger rate for the scenario, each model weighted equally."
-                  meta={`AVG ACROSS ${models.length} MODELS · ${fmt(modeRuns)} RUNS · ${activeMode.label.toUpperCase()} MODE`}
+                  meta={`AVG ACROSS ${data.models.length} MODELS · ${fmt(modeRuns)} RUNS · ${activeMode.label.toUpperCase()} MODE`}
                 >
-                  <ScenarioDifficultyChart mode={mode} />
+                  <ScenarioDifficultyChart mode={mode} rows={data.scenarioDifficultyRanking(mode)} />
                 </ChartPanel>
               </div>
 
@@ -171,7 +264,10 @@ export function DashboardView() {
 
             {/* Status bar */}
             <footer className="mt-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-4 text-[0.72rem] uppercase tracking-[0.08em] text-muted">
-              <span>Deck ADV-INST-01 · Data source mock grid · Integrity OK</span>
+              <span>
+                Deck ADV-INST-01 · Data source{" "}
+                {dataSource === "mock" ? "mock grid" : "Convex saved runs"} · Integrity OK
+              </span>
               <Link
                 href={`/run/${firstRunnable}`}
                 className="inline-flex items-center gap-1 text-accent transition-opacity hover:opacity-80"
@@ -183,6 +279,53 @@ export function DashboardView() {
           </div>
         </div>
       </TooltipBoundary>
+    </div>
+  );
+}
+
+function DataSourceToggle({
+  value,
+  onChange,
+  convexConfigured,
+}: {
+  value: DataSource;
+  onChange: (source: DataSource) => void;
+  convexConfigured: boolean;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Dashboard data source"
+      className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === "mock"}
+        onClick={() => onChange("mock")}
+        className={`rounded-md px-2.5 py-1 text-[0.78rem] font-medium transition-colors duration-150 ${
+          value === "mock"
+            ? "bg-accent-soft text-accent shadow-[0_0_0_1px_var(--accent-soft)]"
+            : "text-muted hover:text-foreground"
+        }`}
+      >
+        Mock
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === "convex"}
+        disabled={!convexConfigured}
+        title={convexConfigured ? "Use saved Convex runs" : "Set NEXT_PUBLIC_CONVEX_URL to use Convex data"}
+        onClick={() => onChange("convex")}
+        className={`rounded-md px-2.5 py-1 text-[0.78rem] font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 ${
+          value === "convex"
+            ? "bg-accent-soft text-accent shadow-[0_0_0_1px_var(--accent-soft)]"
+            : "text-muted hover:text-foreground"
+        }`}
+      >
+        Convex
+      </button>
     </div>
   );
 }

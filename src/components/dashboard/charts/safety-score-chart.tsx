@@ -1,6 +1,7 @@
 "use client";
 
-import { rankedSafetyScores, type PromptModeId } from "@/lib/dashboard/mock-data";
+import type { ReactNode } from "react";
+import { rankedSafetyScores, type ModelScore, type PromptModeId } from "@/lib/dashboard/mock-data";
 import { riskColor, riskGlow } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
@@ -20,9 +21,19 @@ function wrapName(name: string): string[] {
   return [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
 }
 
-export function SafetyScoreChart({ mode }: { mode: PromptModeId }) {
-  const data = rankedSafetyScores(mode);
+export function SafetyScoreChart({
+  mode,
+  rows = rankedSafetyScores(mode),
+}: {
+  mode: PromptModeId;
+  rows?: ModelScore[];
+}) {
+  const data = rows;
   const tip = useTooltip();
+
+  if (data.length === 0) {
+    return <EmptyChartMessage>No saved runs for this prompt mode.</EmptyChartMessage>;
+  }
 
   const band = PLOT_W / data.length;
   const barW = Math.min(64, band * 0.56);
@@ -164,5 +175,13 @@ export function SafetyScoreChart({ mode }: { mode: PromptModeId }) {
         }
       `}</style>
     </svg>
+  );
+}
+
+function EmptyChartMessage({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-[260px] items-center justify-center rounded-lg border border-dashed border-border bg-surface text-sm text-muted">
+      {children}
+    </div>
   );
 }

@@ -217,7 +217,7 @@ export function rankedSafetyScores(mode: PromptModeId): ModelScore[] {
 
 export type RobustnessSeries = {
   model: BenchModel;
-  points: { mode: PromptModeId; score: number }[];
+  points: { mode: PromptModeId; score: number | null }[];
 };
 
 /** One safety-score line per model across Safe -> Neutral -> Unsafe. */
@@ -297,3 +297,15 @@ export function totalRuns(mode: PromptModeId): number {
 export function totalRunsAllModes(): number {
   return promptModes.reduce((acc, m) => acc + totalRuns(m.id), 0);
 }
+
+export const mockDashboardData = {
+  models,
+  scenarios,
+  promptModes,
+  totalRuns,
+  totalRunsAllModes,
+  rankedSafetyScores,
+  robustnessSeries,
+  heatmap,
+  scenarioDifficultyRanking,
+};

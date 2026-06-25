@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { promptModes, robustnessSeries } from "@/lib/dashboard/mock-data";
+import {
+  promptModes,
+  robustnessSeries,
+  type RobustnessSeries,
+} from "@/lib/dashboard/mock-data";
 import { riskColor, riskGlow } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
@@ -11,12 +15,27 @@ const PAD = { top: 28, right: 176, bottom: 44, left: 44 };
 const PLOT_W = W - PAD.left - PAD.right;
 const PLOT_H = H - PAD.top - PAD.bottom;
 
-export function PromptRobustnessChart() {
-  const series = robustnessSeries();
+export function PromptRobustnessChart({
+  series: inputSeries = robustnessSeries(),
+}: {
+  series?: RobustnessSeries[];
+}) {
+  const series = inputSeries;
   const tip = useTooltip();
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const all = series.flatMap((s) => s.points.map((p) => p.score));
+  const all = series.flatMap((s) =>
+    s.points.flatMap((p) => (p.score === null ? [] : [p.score])),
+  );
+
+  if (all.length === 0) {
+    return (
+      <div className="flex min-h-[280px] items-center justify-center rounded-lg border border-dashed border-border bg-surface text-sm text-muted">
+        Save runs across prompt modes to draw robustness lines.
+      </div>
+    );
+  }
+
   const min = Math.max(0, Math.min(...all) - 0.04);
   const max = Math.min(1, Math.max(...all) + 0.04);
 
@@ -28,13 +47,23 @@ export function PromptRobustnessChart() {
 
   // De-overlap right-edge labels.
   const labels = series
-    .map((s) => ({
-      id: s.model.id,
-      name: s.model.name,
-      score: s.points[s.points.length - 1].score,
-      color: riskColor(1 - s.points[1].score),
-      y: y(s.points[s.points.length - 1].score),
-    }))
+    .flatMap((s) => {
+      const lastPoint = [...s.points].reverse().find((p) => p.score !== null);
+      const neutralScore =
+        s.points.find((p) => p.mode === "neutral")?.score ?? lastPoint?.score ?? 0;
+
+      if (!lastPoint || lastPoint.score === null) return [];
+
+      return [
+        {
+          id: s.model.id,
+          name: s.model.name,
+          score: lastPoint.score,
+          color: riskColor(1 - neutralScore),
+          y: y(lastPoint.score),
+        },
+      ];
+    })
     .sort((a, b) => a.y - b.y);
   const MIN_GAP = 18;
   for (let i = 1; i < labels.length; i += 1) {
@@ -101,10 +130,18 @@ export function PromptRobustnessChart() {
       ))}
 
       {series.map((s) => {
-        const color = riskColor(1 - s.points[1].score);
+        const neutralScore =
+          s.points.find((p) => p.mode === "neutral")?.score ??
+          s.points.find((p) => p.score !== null)?.score ??
+          0;
+        const color = riskColor(1 - neutralScore);
         const dim = hovered !== null && hovered !== s.model.id;
         const active = hovered === s.model.id;
-        const d = s.points.map((p, i) => `${x(i)},${y(p.score)}`).join(" ");
+        const points = s.points
+          .map((p, i) => (p.score === null ? null : `${x(i)},${y(p.score)}`))
+          .filter((point): point is string => point !== null);
+        if (points.length === 0) return null;
+
         return (
           <g
             key={s.model.id}
@@ -123,36 +160,40 @@ export function PromptRobustnessChart() {
                     <span key={p.mode} className="tnum text-muted">
                       {promptModes.find((m) => m.id === p.mode)?.label}:{" "}
                       <span className="font-semibold text-foreground">
-                        {pct(p.score, 1)}
+                        {p.score === null ? "No data" : pct(p.score, 1)}
                       </span>
                     </span>
                   ))}
-                  <span className="tnum text-muted">
-                    Safe → Unsafe drop{" "}
-                    <span className="font-semibold text-danger">
-                      {pct(s.points[0].score - s.points[2].score, 1)}
+                  {s.points[0].score !== null && s.points[2].score !== null ? (
+                    <span className="tnum text-muted">
+                      Safe → Unsafe drop{" "}
+                      <span className="font-semibold text-danger">
+                        {pct(s.points[0].score - s.points[2].score, 1)}
+                      </span>
                     </span>
-                  </span>
+                  ) : null}
                 </div>
               ))
             }
           >
-            <polyline
-              points={d}
-              fill="none"
-              stroke={color}
-              strokeWidth={active ? 3.25 : 2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              className="tmb-line"
-              style={{
-                filter: `drop-shadow(0 0 ${active ? 7 : 4}px ${riskGlow(
-                  1 - s.points[1].score,
-                  active ? 0.75 : 0.4,
-                )})`,
-              }}
-            />
-            {s.points.map((p, i) => (
+            {points.length > 1 ? (
+              <polyline
+                points={points.join(" ")}
+                fill="none"
+                stroke={color}
+                strokeWidth={active ? 3.25 : 2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                className="tmb-line"
+                style={{
+                  filter: `drop-shadow(0 0 ${active ? 7 : 4}px ${riskGlow(
+                    1 - neutralScore,
+                    active ? 0.75 : 0.4,
+                  )})`,
+                }}
+              />
+            ) : null}
+            {s.points.flatMap((p, i) => p.score === null ? [] : [(
               <circle
                 key={p.mode}
                 cx={x(i)}
@@ -162,7 +203,7 @@ export function PromptRobustnessChart() {
                 stroke={color}
                 strokeWidth={2}
               />
-            ))}
+            )])}
           </g>
         );
       })}

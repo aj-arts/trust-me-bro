@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "convex/react";
 import {
   Bot,
   Brain,
@@ -19,6 +20,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../../../convex/_generated/api";
 import bash from "react-syntax-highlighter/dist/esm/languages/prism/bash";
 import json from "react-syntax-highlighter/dist/esm/languages/prism/json";
 import markdown from "react-syntax-highlighter/dist/esm/languages/prism/markdown";
@@ -28,6 +30,7 @@ import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
 import { FloatingNav } from "@/components/floating-nav";
+import { useConvexConfigured } from "@/components/providers/convex-client-provider";
 import {
   buildRunnerSystemPrompt,
   DEFAULT_SYSTEM_PROMPT_MODE,
@@ -99,6 +102,9 @@ export function RunnerView({ scenario }: RunnerViewProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [traceEvents, setTraceEvents] = useState<RunnerTraceEvent[]>([]);
   const [runState, setRunState] = useState<RunState>("idle");
+  const [completedAt, setCompletedAt] = useState<number | null>(null);
+  const [runKey, setRunKey] = useState(0);
+  const convexConfigured = useConvexConfigured();
 
   const virtualFiles = useMemo(
     () => toVirtualFiles(scenario.files, scenario.workspaceRoot),
@@ -146,7 +152,9 @@ export function RunnerView({ scenario }: RunnerViewProps) {
 
     setSelectedFile(null);
     setRunState("running");
+    setCompletedAt(null);
     setTraceEvents([]);
+    setRunKey((current) => current + 1);
 
     try {
       const { runScenario } = await import("@/lib/browser-runner/runScenario");
@@ -160,9 +168,11 @@ export function RunnerView({ scenario }: RunnerViewProps) {
           setTraceEvents((currentEvents) => upsertTraceEvent(currentEvents, event));
         },
       });
+      setCompletedAt(Date.now());
       setRunState("completed");
     } catch (error) {
       setRunState("failed");
+      setCompletedAt(null);
       setTraceEvents((currentEvents) => [
         ...currentEvents,
         createTraceEvent(
@@ -289,6 +299,16 @@ export function RunnerView({ scenario }: RunnerViewProps) {
                 scenario={scenario}
                 events={traceEvents}
                 runState={runState}
+              />
+              <SaveRunControl
+                key={runKey}
+                configured={convexConfigured}
+                scenario={scenario}
+                model={model}
+                systemPromptMode={systemPromptMode}
+                events={traceEvents}
+                runState={runState}
+                completedAt={completedAt}
               />
             </section>
           </div>
@@ -850,14 +870,18 @@ type CanaryVerdictProps = {
   runState: RunState;
 };
 
+type SaveRunControlProps = {
+  configured: boolean;
+  scenario: Scenario;
+  model: string;
+  systemPromptMode: SystemPromptMode;
+  events: RunnerTraceEvent[];
+  runState: RunState;
+  completedAt: number | null;
+};
+
 function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
-  const canaryEvents = events.filter((event) => event.type === "canary");
-  const canaryStatuses = scenario.canaries.map((canary) => ({
-    canary,
-    triggered: canaryEvents.some(
-      (event) => event.message.includes(canary.match) || scenario.canaries.length === 1,
-    ),
-  }));
+  const canaryStatuses = canaryStatusesForEvents(scenario, events);
   const canaryTriggered = canaryStatuses.some((status) => status.triggered);
   const verdict = canaryTriggered
     ? canaryVerdictStyles.triggered
@@ -906,6 +930,114 @@ function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
       </div>
     </>
   );
+}
+
+function SaveRunControl(props: SaveRunControlProps) {
+  if (!props.configured) {
+    return (
+      <div className="mt-4 rounded-lg border border-border bg-surface px-3 py-3">
+        <button
+          type="button"
+          disabled
+          className="inline-flex h-9 w-full cursor-not-allowed items-center justify-center rounded-md border border-border bg-surface-2 px-3 text-sm font-medium text-muted opacity-70"
+        >
+          Save run to Convex
+        </button>
+        <p className="mt-2 text-xs leading-5 text-muted">
+          Set NEXT_PUBLIC_CONVEX_URL to enable saved benchmark runs.
+        </p>
+      </div>
+    );
+  }
+
+  return <ConnectedSaveRunControl {...props} />;
+}
+
+function ConnectedSaveRunControl({
+  scenario,
+  model,
+  systemPromptMode,
+  events,
+  runState,
+  completedAt,
+}: SaveRunControlProps) {
+  const saveRun = useMutation(api.runs.save);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const canaryHits = canaryStatusesForEvents(scenario, events)
+    .filter((status) => status.triggered)
+    .map(({ canary }) => ({
+      id: canary.id,
+      label: canary.label,
+      severity: canary.severity,
+    }));
+  const canSave = runState === "completed" && completedAt !== null;
+  const buttonLabel =
+    saveState === "saving"
+      ? "Saving"
+      : saveState === "saved"
+        ? "Saved to Convex"
+        : "Save run to Convex";
+
+  async function handleSave() {
+    if (!canSave || saveState === "saving" || saveState === "saved") return;
+
+    setSaveState("saving");
+    setSaveError(null);
+
+    try {
+      await saveRun({
+        scenarioId: scenario.id,
+        scenarioTitle: scenario.title,
+        model,
+        systemPromptMode,
+        completedAt,
+        passed: canaryHits.length === 0,
+        canaryTriggered: canaryHits.length > 0,
+        canaryHits,
+        traceEventCount: events.length,
+      });
+      setSaveState("saved");
+    } catch (error) {
+      setSaveState("failed");
+      setSaveError(error instanceof Error ? error.message : "Could not save run.");
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-surface px-3 py-3">
+      <button
+        type="button"
+        disabled={!canSave || saveState === "saving" || saveState === "saved"}
+        onClick={handleSave}
+        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-accent px-3 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {saveState === "saving" ? <Loader2 aria-hidden="true" className="animate-spin" size={16} /> : null}
+        {buttonLabel}
+      </button>
+      <p className="mt-2 text-xs leading-5 text-muted">
+        {canSave
+          ? "Saves model, scenario, prompt mode, verdict, and canary hits."
+          : runState === "failed"
+            ? "Only completed runs with a canary verdict can be saved."
+            : "Complete a run before saving it."}
+      </p>
+      {saveError ? (
+        <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-danger">{saveError}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function canaryStatusesForEvents(scenario: Scenario, events: RunnerTraceEvent[]) {
+  const canaryEvents = events.filter((event) => event.type === "canary");
+
+  return scenario.canaries.map((canary) => ({
+    canary,
+    triggered: canaryEvents.some(
+      (event) => event.message.includes(canary.match) || scenario.canaries.length === 1,
+    ),
+  }));
 }
 
 const canaryVerdictStyles = {

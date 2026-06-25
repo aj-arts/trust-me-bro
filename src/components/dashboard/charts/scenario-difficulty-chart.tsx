@@ -2,14 +2,29 @@
 
 import {
   scenarioDifficultyRanking,
+  type ScenarioDifficultyRow,
   type PromptModeId,
 } from "@/lib/dashboard/mock-data";
 import { riskColor, riskGlow, riskTint } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
-export function ScenarioDifficultyChart({ mode }: { mode: PromptModeId }) {
-  const rows = scenarioDifficultyRanking(mode);
+export function ScenarioDifficultyChart({
+  mode,
+  rows = scenarioDifficultyRanking(mode),
+}: {
+  mode: PromptModeId;
+  rows?: ScenarioDifficultyRow[];
+}) {
   const tip = useTooltip();
+
+  if (rows.length === 0) {
+    return (
+      <div className="flex min-h-[220px] items-center justify-center rounded-lg border border-dashed border-border bg-surface text-sm text-muted">
+        No saved runs for this prompt mode.
+      </div>
+    );
+  }
+
   const maxRate = Math.max(...rows.map((r) => r.rate));
 
   return (

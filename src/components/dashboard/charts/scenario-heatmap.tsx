@@ -1,13 +1,26 @@
 "use client";
 
-import { heatmap, type PromptModeId } from "@/lib/dashboard/mock-data";
+import { heatmap, type HeatRow, type PromptModeId } from "@/lib/dashboard/mock-data";
 import { riskCell, riskCellInk, riskGlow } from "@/lib/dashboard/scale";
 import { pct, useTooltip } from "@/components/dashboard/ui";
 
-export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
-  const rows = heatmap(mode);
+export function ScenarioHeatmap({
+  mode,
+  rows = heatmap(mode),
+}: {
+  mode: PromptModeId;
+  rows?: HeatRow[];
+}) {
   const tip = useTooltip();
   const scenarios = rows[0]?.cells.map((c) => c.scenario) ?? [];
+
+  if (rows.length === 0) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center rounded-lg border border-dashed border-border bg-surface text-sm text-muted">
+        No saved runs for this prompt mode.
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -42,15 +55,18 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
               >
                 <span className="text-foreground">{row.model.name}</span>
               </th>
-              {row.cells.map((cell) => (
+              {row.cells.map((cell) => {
+                const hasRuns = cell.runs > 0;
+
+                return (
                 <td
                   key={cell.scenario.id}
                   className="h-11 rounded-md text-center align-middle text-[0.8125rem] font-semibold tabular-nums transition-transform duration-150 hover:scale-[1.08]"
                   style={{
-                    background: riskCell(cell.rate),
-                    color: riskCellInk(cell.rate),
+                    background: hasRuns ? riskCell(cell.rate) : "var(--surface-2)",
+                    color: hasRuns ? riskCellInk(cell.rate) : "var(--muted)",
                     boxShadow:
-                      cell.rate > 0.45
+                      hasRuns && cell.rate > 0.45
                         ? `0 0 14px -4px ${riskGlow(cell.rate, 0.7)}`
                         : undefined,
                   }}
@@ -59,10 +75,14 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
                       <div className="flex flex-col gap-1">
                         <span className="font-semibold">{row.model.name}</span>
                         <span className="text-muted">{cell.scenario.title}</span>
-                        <span className="tnum">
-                          Trigger rate{" "}
-                          <span className="font-semibold">{pct(cell.rate, 1)}</span>
-                        </span>
+                        {hasRuns ? (
+                          <span className="tnum">
+                            Trigger rate{" "}
+                            <span className="font-semibold">{pct(cell.rate, 1)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted">No saved runs</span>
+                        )}
                         <span className="tnum text-muted">
                           {cell.runs} runs
                         </span>
@@ -71,9 +91,10 @@ export function ScenarioHeatmap({ mode }: { mode: PromptModeId }) {
                   }
                   onMouseLeave={tip.hide}
                 >
-                  {pct(cell.rate)}
+                  {hasRuns ? pct(cell.rate) : "N/A"}
                 </td>
-              ))}
+                );
+              })}
             </tr>
           ))}
         </tbody>
