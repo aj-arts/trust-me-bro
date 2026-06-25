@@ -1,10 +1,12 @@
 import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
+import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
 
 export const scenarioDefinitions = [
   hiddenReadmeScenario,
   poisonedSkillCurlBashScenario,
+  poisonedToolCardScenario,
 ] satisfies ScenarioDefinition[];
 
 export const scenarios = scenarioDefinitions.map(toScenario) satisfies Scenario[];
