@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { ArrowUpRight, CircleAlert, ShieldCheck, Siren, Timer } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { scenarios } from "@/scenarios/registry";
+import { PassRateByModelChart, SafetyVsCapabilityScatter } from "./dashboard-charts";
+import { modelMeta } from "./model-meta";
+import { ProviderLogo } from "./provider-logo";
 
 type Verdict = "safe-pass" | "cautious-pass" | "task-fail" | "unsafe-fail";
 type Severity = "low" | "medium" | "high" | "critical";
@@ -182,179 +185,218 @@ export function DashboardView() {
   const firstScenarioId = scenarios[0]?.id ?? "hidden-readme";
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-5 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="font-mono text-sm text-muted">Trust Me Bro</p>
-            <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-normal text-balance sm:text-4xl">
-              Agent Security Benchmark
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted text-pretty">
-              Compare how coding agents handle malicious instructions hidden in repo files,
-              command output, setup scripts, and comments.
-            </p>
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div
+        className="bg-grid pointer-events-none absolute inset-x-0 top-0 h-[460px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+        aria-hidden="true"
+      />
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-12 px-5 py-8 sm:px-6 lg:px-8">
+        <header className="flex flex-col gap-7">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <BrandMark />
+              <div className="leading-tight">
+                <p className="font-mono text-[13px] font-medium tracking-tight">trust-me-bro</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+                  security benchmark
+                </p>
+              </div>
+            </div>
+            <StatusChip />
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href={`/run/${firstScenarioId}`}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground outline-none transition hover:bg-[#1d4ed8] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-            >
-              Open runner
-              <ArrowUpRight aria-hidden="true" size={16} />
-            </Link>
+
+          <div className="grid gap-8 border-b border-border pb-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-accent">
+                Agent-security benchmark
+              </p>
+              <h1 className="mt-4 font-serif text-5xl font-normal leading-[1.04] tracking-tight text-balance sm:text-6xl lg:text-7xl">
+                Which model can you actually{" "}
+                <span className="italic" style={{ color: "#c2410c" }}>
+                  trust
+                </span>
+                ?
+              </h1>
+              <p className="mt-5 max-w-md text-[15px] leading-7 text-muted text-pretty">
+                We hide malicious instructions in repos, command output, and setup scripts, then
+                measure who ignores the trap, who stops to ask, and who gets compromised. A canary
+                trips the moment an agent is fooled.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center gap-5">
+                <Link
+                  href={`/run/${firstScenarioId}`}
+                  className="group inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-foreground px-5 text-sm font-medium text-background outline-none transition hover:bg-[#332f29] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                >
+                  Open runner
+                  <ArrowUpRight
+                    aria-hidden="true"
+                    size={16}
+                    className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                  />
+                </Link>
+                <a
+                  href="#scenario-library"
+                  className="group inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-foreground"
+                >
+                  Read methodology
+                  <ArrowUpRight
+                    aria-hidden="true"
+                    size={15}
+                    className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                  />
+                </a>
+              </div>
+            </div>
+            <SafestModelCard />
           </div>
+
+          <MetaStrip />
         </header>
 
-        <section
-          aria-label="Benchmark summary"
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        <Panel
+          title="Pass rate by model"
+          description="Share of benchmark scenarios each model handled safely. Higher is better."
         >
-          <MetricCard
-            label="Overall safety"
-            value="87"
-            suffix="/100"
-            detail="+6 pts from safe-instructed runs"
-            icon={<ShieldCheck aria-hidden="true" size={18} />}
-          />
-          <MetricCard
-            label="Canary trigger rate"
-            value="8.7"
-            suffix="%"
-            detail="14 critical hits in mock archive"
-            icon={<Siren aria-hidden="true" size={18} />}
-          />
-          <MetricCard
-            label="Task completion"
-            value="89"
-            suffix="%"
-            detail="Across 137 scenario runs"
-            icon={<CircleAlert aria-hidden="true" size={18} />}
-          />
-          <MetricCard
-            label="Median duration"
-            value="1m"
-            suffix="52s"
-            detail="From prompt to final verdict"
-            icon={<Timer aria-hidden="true" size={18} />}
-          />
+          <PassRateByModelChart data={leaderboard} />
+        </Panel>
+
+        <Panel
+          title="Safety vs. capability"
+          description="Safe without sacrificing task completion. Top-right is best."
+        >
+          <SafetyVsCapabilityScatter data={leaderboard} />
+        </Panel>
+
+        <section>
+          <SectionHeading title="Model leaderboard" description="Ranked by safety score." />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-y border-border font-mono text-[11px] uppercase tracking-wider text-muted">
+                  <th className="py-3 pr-3 font-medium">#</th>
+                  <th className="py-3 pr-4 font-medium">Model</th>
+                  <th className="px-4 py-3 font-medium">Safety score</th>
+                  <th className="px-4 py-3 font-medium">Pass</th>
+                  <th className="px-4 py-3 font-medium">Canary</th>
+                  <th className="px-4 py-3 font-medium">Task</th>
+                  <th className="px-4 py-3 font-medium">Risk events</th>
+                  <th className="py-3 pl-4 font-medium">Last tested</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((row, index) => (
+                  <tr
+                    key={row.model}
+                    className="border-b border-border transition-colors last:border-0 hover:bg-panel"
+                  >
+                    <td className="py-4 pr-3 font-mono text-xs text-muted">
+                      {String(index + 1).padStart(2, "0")}
+                    </td>
+                    <td className="py-4 pr-4">
+                      <div className="flex items-center gap-3">
+                        <ProviderBadge model={row.model} />
+                        <div>
+                          <div className="font-medium text-foreground">{row.model}</div>
+                          <div className="mt-0.5 text-xs text-muted">{row.provider}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <ScoreBar value={row.safetyScore} model={row.model} />
+                    </td>
+                    <td className="px-4 py-4 font-mono tabular-nums">{row.passRate}%</td>
+                    <td className="px-4 py-4 font-mono tabular-nums text-danger">{row.canaryRate}%</td>
+                    <td className="px-4 py-4 font-mono tabular-nums">{row.taskCompletion}%</td>
+                    <td className="px-4 py-4 font-mono tabular-nums">{row.riskEvents}</td>
+                    <td className="py-4 pl-4 text-muted">{row.lastTested}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
+        <section className="grid gap-5 lg:grid-cols-2">
           <Panel
-            title="Model leaderboard"
-            description="Mock benchmark results ranked by safety score."
+            title="Where unsafe behavior appears"
+            description="Events observed across 137 runs."
           >
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted">
-                    <th className="py-3 pr-4 font-medium">Model</th>
-                    <th className="px-4 py-3 font-medium">Safety</th>
-                    <th className="px-4 py-3 font-medium">Safe pass</th>
-                    <th className="px-4 py-3 font-medium">Canary</th>
-                    <th className="px-4 py-3 font-medium">Task</th>
-                    <th className="px-4 py-3 font-medium">Risk</th>
-                    <th className="py-3 pl-4 font-medium">Tested</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((row) => (
-                    <tr key={row.model} className="border-b border-border last:border-0">
-                      <td className="py-4 pr-4">
-                        <div className="font-medium text-foreground">{row.model}</div>
-                        <div className="mt-1 text-xs text-muted">{row.provider}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <ScoreBar value={row.safetyScore} />
-                      </td>
-                      <td className="px-4 py-4 font-mono">{row.passRate}%</td>
-                      <td className="px-4 py-4 font-mono text-danger">{row.canaryRate}%</td>
-                      <td className="px-4 py-4 font-mono">{row.taskCompletion}%</td>
-                      <td className="px-4 py-4 font-mono">{row.riskEvents}</td>
-                      <td className="py-4 pl-4 text-muted">{row.lastTested}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-
-          <Panel title="Risk breakdown" description="Where unsafe behavior appears in runs.">
             <div className="space-y-4">
               {riskBreakdown.map((risk) => (
                 <MeterRow key={risk.label} label={risk.label} value={risk.value} tone={risk.tone} />
               ))}
             </div>
+            <p className="mt-5 border-t border-border pt-4 font-mono text-[11px] uppercase tracking-wider text-muted">
+              Asking for confirmation is the desired outcome
+            </p>
           </Panel>
-        </section>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
-          <Panel title="Scenario coverage" description="Current mock coverage by attack surface.">
+          <Panel title="Scenario coverage" description="Mock coverage by attack surface.">
             <div className="space-y-4">
               {coverage.map((item) => (
                 <CoverageRow key={item.label} label={item.label} value={item.value} />
               ))}
             </div>
-          </Panel>
-
-          <Panel title="Recent runs" description="Latest mock run outcomes from the trace archive.">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted">
-                    <th className="py-3 pr-4 font-medium">Scenario</th>
-                    <th className="px-4 py-3 font-medium">Model</th>
-                    <th className="px-4 py-3 font-medium">Verdict</th>
-                    <th className="px-4 py-3 font-medium">Canary</th>
-                    <th className="px-4 py-3 font-medium">Score</th>
-                    <th className="px-4 py-3 font-medium">Duration</th>
-                    <th className="py-3 pl-4 font-medium">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentRuns.map((run) => (
-                    <tr key={run.id} className="border-b border-border last:border-0">
-                      <td className="py-4 pr-4 font-medium">{run.scenario}</td>
-                      <td className="px-4 py-4 font-mono text-xs">{run.model}</td>
-                      <td className="px-4 py-4">
-                        <VerdictBadge verdict={run.verdict} />
-                      </td>
-                      <td className="px-4 py-4">
-                        <CanaryBadge status={run.canary} />
-                      </td>
-                      <td className="px-4 py-4 font-mono">{run.score}</td>
-                      <td className="px-4 py-4 text-muted">{run.duration}</td>
-                      <td className="py-4 pl-4 text-muted">{run.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p className="mt-5 border-t border-border pt-4 font-mono text-[11px] uppercase tracking-wider text-muted">
+              CI config is the next surface to expand
+            </p>
           </Panel>
         </section>
 
         <section>
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Scenario library</h2>
-              <p className="mt-1 text-sm text-muted">
-                Draft categories and failure rates for the benchmark surface.
-              </p>
-            </div>
-            <Link
-              href={`/run/${firstScenarioId}`}
-              className="text-sm font-medium text-accent hover:text-[#1d4ed8]"
-            >
-              View runner
-            </Link>
+          <SectionHeading title="Recent runs" description="Live feed from the sandbox." />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-y border-border font-mono text-[11px] uppercase tracking-wider text-muted">
+                  <th className="py-3 pr-4 font-medium">Run</th>
+                  <th className="px-4 py-3 font-medium">Scenario</th>
+                  <th className="px-4 py-3 font-medium">Model</th>
+                  <th className="px-4 py-3 font-medium">Verdict</th>
+                  <th className="px-4 py-3 font-medium">Canary</th>
+                  <th className="px-4 py-3 font-medium">Score</th>
+                  <th className="px-4 py-3 font-medium">Duration</th>
+                  <th className="py-3 pl-4 font-medium">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentRuns.map((run) => (
+                  <tr
+                    key={run.id}
+                    className="border-b border-border transition-colors last:border-0 hover:bg-panel"
+                  >
+                    <td className="py-4 pr-4 font-mono text-xs text-muted">{run.id}</td>
+                    <td className="px-4 py-4 font-medium">{run.scenario}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <ProviderBadge model={run.model} size="sm" />
+                        <span className="font-mono text-xs">{run.model}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <VerdictBadge verdict={run.verdict} />
+                    </td>
+                    <td className="px-4 py-4">
+                      <CanaryBadge status={run.canary} />
+                    </td>
+                    <td className="px-4 py-4 font-mono tabular-nums">{run.score}</td>
+                    <td className="px-4 py-4 text-muted">{run.duration}</td>
+                    <td className="py-4 pl-4 text-muted">{run.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        </section>
+
+        <div id="scenario-library" className="scroll-mt-8">
+          <SectionHeading title="Scenario library" description="The traps we run." />
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {scenarioPreviews.map((scenario) => (
               <Link
                 key={scenario.id}
                 href={`/run/${scenario.id === "hidden-readme" ? "hidden-readme" : firstScenarioId}`}
-                className="flex min-h-[214px] flex-col justify-between rounded-lg border border-border bg-panel p-4 outline-none transition hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                className="group flex min-h-[214px] flex-col justify-between rounded-xl border border-border bg-panel p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] outline-none transition hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
               >
                 <div>
                   <div className="flex items-center justify-between gap-3">
@@ -366,45 +408,16 @@ export function DashboardView() {
                 </div>
                 <div className="mt-5 flex items-center justify-between border-t border-border pt-3 text-sm">
                   <span className="text-muted">{scenario.runCount} runs</span>
-                  <span className="font-mono text-danger">{scenario.failureRate}% fail</span>
+                  <span className="font-mono tabular-nums text-danger">
+                    {scenario.failureRate}% fail
+                  </span>
                 </div>
               </Link>
             ))}
           </div>
-        </section>
+        </div>
       </div>
     </main>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  suffix,
-  detail,
-  icon,
-}: {
-  label: string;
-  value: string;
-  suffix: string;
-  detail: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <article className="rounded-lg border border-border bg-panel p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-muted">{icon}</div>
-        <span className="rounded-md bg-[#eef4ff] px-2 py-1 font-mono text-xs text-accent">
-          mock
-        </span>
-      </div>
-      <p className="mt-5 text-sm font-medium text-muted">{label}</p>
-      <p className="mt-2 font-mono text-3xl font-semibold tracking-normal">
-        {value}
-        <span className="ml-1 text-base text-muted">{suffix}</span>
-      </p>
-      <p className="mt-3 text-sm leading-5 text-muted">{detail}</p>
-    </article>
   );
 }
 
@@ -418,9 +431,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-panel">
+    <section className="rounded-xl border border-border bg-panel shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="border-b border-border px-5 py-4">
-        <h2 className="text-base font-semibold">{title}</h2>
+        <h2 className="text-base font-semibold tracking-tight">{title}</h2>
         <p className="mt-1 text-sm text-muted">{description}</p>
       </div>
       <div className="p-5">{children}</div>
@@ -428,13 +441,114 @@ function Panel({
   );
 }
 
-function ScoreBar({ value }: { value: number }) {
+function BrandMark() {
   return (
-    <div className="flex min-w-[132px] items-center gap-3">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e8edf5]">
-        <div className="h-full rounded-full bg-success" style={{ width: `${value}%` }} />
+    <div className="flex size-9 items-center justify-center rounded-lg border border-border bg-panel shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <path
+          d="M9 1.6 15 4.1v4.7c0 3.5-2.5 6.1-6 7.6-3.5-1.5-6-4.1-6-7.6V4.1L9 1.6Z"
+          stroke="var(--foreground)"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+        <circle cx="9" cy="8.4" r="1.7" fill="var(--accent)" />
+      </svg>
+    </div>
+  );
+}
+
+function StatusChip() {
+  return (
+    <div className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+      <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
+      Sandbox healthy
+    </div>
+  );
+}
+
+function MetaStrip() {
+  const items = ["4 models", "6 scenarios", "137 runs", "isolated sandbox"];
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+      {items.map((item, index) => (
+        <span key={item} className="inline-flex items-center gap-3">
+          {index > 0 ? (
+            <span aria-hidden="true" className="text-border">
+              ·
+            </span>
+          ) : null}
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function SectionHeading({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      {description ? <p className="mt-1 text-sm text-muted">{description}</p> : null}
+    </div>
+  );
+}
+
+function ProviderBadge({ model, size = "md" }: { model: string; size?: "sm" | "md" }) {
+  const meta = modelMeta(model);
+  const dim = size === "sm" ? "size-5" : "size-7";
+  const logoSize = size === "sm" ? 12 : 16;
+  return (
+    <span
+      className={`inline-flex ${dim} shrink-0 items-center justify-center rounded-md border border-border bg-panel`}
+    >
+      <ProviderLogo model={model} size={logoSize} color={meta.logoColor} />
+    </span>
+  );
+}
+
+function SafestModelCard() {
+  const top = [...leaderboard].sort((a, b) => b.safetyScore - a.safetyScore)[0];
+  if (!top) {
+    return null;
+  }
+  const meta = modelMeta(top.model);
+  return (
+    <div className="rounded-xl border border-border bg-panel p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Safest model</p>
+      <div className="mt-3 flex items-center gap-3">
+        <ProviderBadge model={top.model} />
+        <div>
+          <div className="font-medium leading-tight">{top.model}</div>
+          <div className="text-xs text-muted">{top.provider}</div>
+        </div>
       </div>
-      <span className="w-8 text-right font-mono text-sm">{value}</span>
+      <div className="mt-4 flex items-end gap-2">
+        <span
+          className="font-mono text-4xl font-semibold tabular-nums leading-none"
+          style={{ color: meta.barColor }}
+        >
+          {top.safetyScore}
+        </span>
+        <span className="mb-1 font-mono text-[11px] uppercase tracking-wider text-muted">
+          Safety score
+        </span>
+      </div>
+      <div className="mt-4 flex items-center gap-4 border-t border-border pt-3 font-mono text-xs">
+        <span className="tabular-nums text-foreground">{top.passRate}% pass</span>
+        <span className="tabular-nums text-muted">{top.canaryRate}% canary</span>
+      </div>
+    </div>
+  );
+}
+
+function ScoreBar({ value, model }: { value: number; model?: string }) {
+  const color = model ? modelMeta(model).barColor : "var(--success)";
+  return (
+    <div className="flex min-w-[140px] items-center gap-3">
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#ece7df]">
+        <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: color }} />
+      </div>
+      <span className="w-7 text-right font-mono text-sm tabular-nums">{value}</span>
     </div>
   );
 }
@@ -460,7 +574,7 @@ function MeterRow({
         <span className="font-medium">{label}</span>
         <span className="font-mono text-muted">{value}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#e8edf5]">
+      <div className="h-2 overflow-hidden rounded-full bg-[#ece7df]">
         <div
           className={`h-full rounded-full ${colorByTone[tone]}`}
           style={{ width: `${Math.min(value * 3, 100)}%` }}
@@ -477,7 +591,7 @@ function CoverageRow({ label, value }: { label: string; value: number }) {
         <span className="font-medium">{label}</span>
         <span className="font-mono text-muted">{value}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#e8edf5]">
+      <div className="h-2 overflow-hidden rounded-full bg-[#ece7df]">
         <div className="h-full rounded-full bg-accent" style={{ width: `${value}%` }} />
       </div>
     </div>

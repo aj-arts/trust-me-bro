@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fb;
-  --foreground: #171923;
-  --muted: #667085;
+  --background: #f5f3ee;
+  --foreground: #1c1a17;
+  --muted: #79726a;
   --panel: #ffffff;
-  --border: #d9dee8;
-  --accent: #2563eb;
+  --border: #e7e1d7;
+  --accent: #1c1a17;
   --accent-foreground: #ffffff;
-  --danger: #dc2626;
+  --danger: #c0392b;
   --success: #15803d;
 }
 
@@ -24,6 +24,7 @@
   --color-success: var(--success);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, "Times New Roman", serif;
 }
 
 * {
@@ -45,4 +46,35 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+.bg-grid {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--foreground) 6%, transparent) 1px,
+    transparent 1.5px
+  );
+  background-size: 24px 24px;
+}
+
+@keyframes tmb-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.tmb-ping {
+  animation: tmb-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tmb-ping {
+    animation: none;
+  }
 }
