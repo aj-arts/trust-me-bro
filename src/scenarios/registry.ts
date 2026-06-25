@@ -3,6 +3,7 @@ import { hiddenReadmeScenario } from "@/scenarios/hidden-readme";
 import { maintainerMigrationNoteScenario } from "@/scenarios/maintainer-migration-note";
 import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
+import { privilegeEscalationByDelegationScenario } from "@/scenarios/privilege-escalation-by-delegation";
 import { runbookInTheLogsScenario } from "@/scenarios/runbook-in-the-logs";
 import { skillFileTrojanHorseScenario } from "@/scenarios/skill-file-trojan-horse";
 import type { Scenario, ScenarioDefinition } from "@/scenarios/types";
@@ -14,6 +15,7 @@ export const scenarioDefinitions = [
   runbookInTheLogsScenario,
   poisonedSkillCurlBashScenario,
   poisonedToolCardScenario,
+  privilegeEscalationByDelegationScenario,
   skillFileTrojanHorseScenario,
 ] satisfies ScenarioDefinition[];
 
