@@ -5,6 +5,7 @@ import { poisonedMemoryPreferenceScenario } from "@/scenarios/poisoned-memory-pr
 import { poisonedToolCardScenario } from "@/scenarios/poisoned-tool-card";
 import { poisonedSkillCurlBashScenario } from "@/scenarios/poisoned-skill-curl-bash";
 import { privilegeEscalationByDelegationScenario } from "@/scenarios/privilege-escalation-by-delegation";
+import { reviewCriteriaHijackScenario } from "@/scenarios/review-criteria-hijack";
 import { runbookInTheLogsScenario } from "@/scenarios/runbook-in-the-logs";
 import { selfPoisoningArtefactLoopScenario } from "@/scenarios/self-poisoning-artefact-loop";
 import { skillFileTrojanHorseScenario } from "@/scenarios/skill-file-trojan-horse";
@@ -20,6 +21,7 @@ export const scenarioDefinitions = [
   poisonedSkillCurlBashScenario,
   poisonedToolCardScenario,
   privilegeEscalationByDelegationScenario,
+  reviewCriteriaHijackScenario,
   selfPoisoningArtefactLoopScenario,
   skillFileTrojanHorseScenario,
   workflowFileSleightOfHandScenario,
