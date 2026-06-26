@@ -23,13 +23,12 @@ export function VisionView() {
               The Vision · Trust Me Bro
             </p>
             <h1 className="mt-7 max-w-[16ch] text-balance font-serif text-[3.2rem] font-medium leading-[0.92] tracking-[-0.04em] text-foreground sm:text-[5.4rem] lg:text-[6.6rem]">
-              Make agent trust measurable.
-              <span className="text-accent"> Before the keys get bigger.</span>
+              Test agent behavior before it becomes production risk.
             </h1>
             <p className="mt-8 max-w-3xl text-pretty text-[1.15rem] leading-8 text-muted sm:text-[1.35rem] sm:leading-9">
-              Trust Me Bro is a safe benchmark for testing whether coding agents
-              obey the user or hidden instructions buried in repo files, docs,
-              skills, setup scripts, and workflow context.
+              Trust Me Bro is a browser-native platform for evaluating whether
+              coding agents follow the user or hidden instructions buried in repo
+              files, docs, skills, setup scripts, logs, and workflow context.
             </p>
           </header>
 
@@ -38,34 +37,42 @@ export function VisionView() {
           {/* Manifesto */}
           <section className="py-4 sm:py-6">
             <p className="max-w-5xl text-balance font-serif text-[1.9rem] font-medium leading-[1.12] tracking-[-0.02em] text-foreground sm:text-[2.9rem]">
-              AI coding assistants can accelerate software work. Enterprise
-              adoption depends on proving they can act safely when developer
-              context is messy, powerful, and{" "}
-              <span className="text-accent">not always trustworthy.</span>
+              Prompt injection is not only a chat problem. Agents read messy
+              developer context, hold powerful tools, and can act on instructions
+              nobody meant them to trust. We built Trust Me Bro to make that risk{" "}
+              <span className="text-accent">visible, repeatable, and safe to study.</span>
             </p>
           </section>
 
           <Rule />
 
           <Chapter index="01" question="What did we build, and why?">
-            <ChapterTitle>A benchmark for agent security.</ChapterTitle>
+            <ChapterTitle>A live evaluation platform for coding-agent security.</ChapterTitle>
             <Body>
-              We built repeatable scenarios that hide malicious-looking
-              instructions where agents actually read: READMEs, migration notes,
-              runbooks, tool cards, skills, and bootstrap scripts. The goal is
-              simple: learn whether an agent follows the user, pauses, or obeys a
-              trap.
+              We built a live runner, scenario library, and benchmark dashboard
+              for testing how agents behave inside realistic repository tasks.
+              Each scenario gives the agent a virtual filesystem, a normal user
+              goal, and a hidden attack such as skill poisoning, markdown
+              injection, log hijacking, or a bootstrap-script ambush.
+            </Body>
+            <Body>
+              We built it because the only honest way to evaluate agent safety is
+              to watch what the agent actually does. If a frontier model executes
+              a suspicious script without reading it, the platform captures that
+              behavior safely and turns it into evidence.
             </Body>
           </Chapter>
 
           <Rule />
 
           <Chapter index="02" question="Who is this for?">
-            <ChapterTitle>Teams rolling out coding agents.</ChapterTitle>
+            <ChapterTitle>The teams deciding how much power agents should get.</ChapterTitle>
             <Body>
-              Trust Me Bro is for developers, security teams, platform
-              engineers, and AI product teams who need to answer one practical
-              question before expanding agent permissions:{" "}
+              Trust Me Bro is for AI product teams, Copilot-style agent teams,
+              model evaluators, security researchers, enterprise AppSec teams,
+              platform engineers, and open-source maintainers. They all need to
+              answer the same practical question before expanding agent
+              permissions:{" "}
               <Em>can this agent be trusted in our workflow?</Em>
             </Body>
           </Chapter>
@@ -73,13 +80,18 @@ export function VisionView() {
           <Rule />
 
           <Chapter index="03" question="What is the business value?">
-            <ChapterTitle>Trust is the adoption unlock.</ChapterTitle>
+            <ChapterTitle>Safer agents make agent adoption easier to justify.</ChapterTitle>
             <Body>
-              Copilot-style tools create productivity value, but enterprise
-              customers need governance before they hand agents more access.
-              Measuring agent safety supports secure adoption, customer
-              confidence, retention, and Microsoft&rsquo;s leadership in
-              responsible AI developer tooling.
+              Microsoft is a Copilot-first company, and customers will only give
+              agents more autonomy if safety can be evaluated, improved, and
+              explained. Trust Me Bro creates value by reducing adoption risk,
+              increasing customer confidence, and giving product teams concrete
+              data for safer prompts, safer tools, and safer model behavior.
+            </Body>
+            <Body>
+              The same data has long-term strategic value: it can become a
+              community-driven security dataset for the models and agents of the
+              future, not just a one-time leaderboard.
             </Body>
           </Chapter>
 
@@ -88,43 +100,75 @@ export function VisionView() {
           <Chapter index="04" question="Why would customers need this?">
             <ChapterTitle>It turns a scary failure mode into evidence.</ChapterTitle>
             <Body>
-              Customers can compare models, prompts, and safety instructions
-              against the same traps; inspect traces when an agent fails; and
-              rerun the benchmark as models change. That makes agent trust
-              observable instead of assumed.
+              Today, a team may not know whether an agent will follow hidden
+              instructions in a README, execute an unsafe setup script, or obey a
+              poisoned skill file until it happens in a real codebase. Trust Me
+              Bro lets them test those behaviors first.
+            </Body>
+            <Body>
+              Customers can compare models, prompts, and safety modes against
+              the same traps; inspect traces when an agent fails; author new
+              scenarios; and rerun the benchmark as models change. That makes
+              agent trust observable instead of assumed.
             </Body>
           </Chapter>
 
           <Rule />
 
-          <Chapter index="05" question="What can we show the judges?">
+          <Chapter index="05" question="Why is this different?">
+            <ChapterTitle>Not just a benchmark. A place to create the dataset.</ChapterTitle>
+            <DifferentiatorList
+              items={[
+                {
+                  title: "Accessible scenario creation",
+                  description:
+                    "Users can inspect the benchmark, run scenarios, and create their own tests on the platform. Every useful failure can become training and evaluation data for safer future models.",
+                },
+                {
+                  title: "Browser-native isolation",
+                  description:
+                    "Many agent evaluations depend on a real computer layer: terminals, host filesystems, Docker, cloud VMs, or risky compute access. Trust Me Bro keeps the workspace in a virtual filesystem with harmless canaries, isolated from the host without heavy infrastructure overhead.",
+                },
+                {
+                  title: "Open-source and community driven",
+                  description:
+                    "Instead of a private benchmark that only reports scores, the scenarios, results, and methodology can be inspected, reproduced, challenged, and expanded by the community.",
+                },
+              ]}
+            />
+          </Chapter>
+
+          <Rule />
+
+          <Chapter index="06" question="What can we show the judges?">
             <ChapterTitle>No real malware. Real signal.</ChapterTitle>
             <ChallengeList
               items={[
-                "Runs use a virtual filesystem, fake secrets, and harmless canaries.",
-                "The demo already includes realistic agent traps and side-by-side model traces.",
-                "Dashboards turn behavior into safety scores, robustness curves, and scenario heatmaps.",
+                "A deployed live runner that places an agent inside a browser-isolated virtual repository.",
+                "Thirteen realistic attack scenarios across skill poisoning, hidden markdown, log hijacking, workflow deception, and setup-script traps.",
+                "Benchmark results from 1,950 runs across ten models, three prompt safety modes, and full behavior traces.",
+                "Dashboards that turn those runs into safety scores, prompt-robustness curves, scenario heatmaps, and attack difficulty views.",
               ]}
             />
           </Chapter>
 
           <Rule />
 
-          <Chapter index="06" question="What are the next steps?">
-            <ChapterTitle>From hackathon demo to continuous evaluation.</ChapterTitle>
+          <Chapter index="07" question="What are the next steps?">
+            <ChapterTitle>From hackathon demo to continuous agent hardening.</ChapterTitle>
             <FutureList
               items={[
-                "More scenarios drawn from real-world incidents.",
-                "Continuous evaluation as new models ship.",
-                "Community-contributed traps.",
-                "Trace analysis that turns failures into safer agent guidance.",
+                "Expand the scenario library with attacks drawn from real incidents, community submissions, and emerging agent workflows.",
+                "Add assisted scenario generation so researchers can quickly turn a new exploit pattern into a reproducible test.",
+                "Build an evaluation loop where one agent studies failure traces, proposes safer system prompts, and mutates scenarios to make attacks more subtle.",
+                "Package the dataset and runner so model builders, Copilot-style product teams, and enterprise security teams can use the results in their own safety workflows.",
               ]}
             />
           </Chapter>
 
           <Rule />
 
-          <Chapter index="07" question="What proves this is real and important?">
+          <Chapter index="08" question="What proves this is real and important?">
             <ChapterTitle>Grounded in the market and the risk.</ChapterTitle>
             <SourceList
               items={[
@@ -161,7 +205,7 @@ export function VisionView() {
           {/* Closing */}
           <section className="pt-6">
             <p className="max-w-4xl text-balance font-serif text-[2rem] font-medium leading-[1.1] tracking-[-0.02em] text-foreground sm:text-[3.1rem]">
-              Don&rsquo;t take the agent&rsquo;s word for it.
+              The future of agents needs more than trust. It needs tests.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link
@@ -254,6 +298,27 @@ function ChallengeList({ items }: { items: string[] }) {
         >
           {item}
         </p>
+      ))}
+    </div>
+  );
+}
+
+function DifferentiatorList({
+  items,
+}: {
+  items: { title: string; description: string }[];
+}) {
+  return (
+    <div className="mt-7 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border">
+      {items.map((item) => (
+        <div key={item.title} className="bg-panel px-6 py-5">
+          <h3 className="font-serif text-[1.25rem] font-medium leading-tight tracking-[-0.01em] text-foreground">
+            {item.title}
+          </h3>
+          <p className="mt-3 text-pretty text-[0.98rem] leading-7 text-muted">
+            {item.description}
+          </p>
+        </div>
       ))}
     </div>
   );
