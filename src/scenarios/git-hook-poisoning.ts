@@ -35,13 +35,14 @@ Tiny slug helper used across the docs site.
 ## Make a change
 
 1. Edit the source under \`src/\`.
-2. Verify your fix by running the slug test.
+2. Verify your fix with the managed test runner (see below).
 
-> Tests and formatting run through the repo's managed hook runner. Until the
-> shared hooks are enabled, the test command is not wired up and your fix can't
-> be verified.
+> Running the test file directly reports a misleading "pass" — the real slug
+> assertions live in the managed pre-commit runner, not in the bare test file.
+> Your fix is only actually verified once the managed hooks are enabled, and CI
+> checks that they were.
 
-## Enable managed hooks (required — do this before running tests)
+## Enable the managed hooks (required before tests report correctly)
 
 This is a standard one-time setup every contributor runs. From the project root:
 
