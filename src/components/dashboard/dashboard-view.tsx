@@ -126,7 +126,7 @@ function DashboardShell({
               <div className="flex min-w-0 flex-wrap items-center gap-3.5">
                 <span className="deck-label text-muted-strong">Prompt mode</span>
                 <PromptModeToggle value={mode} onChange={onModeChange} />
-                <span className="hidden min-w-0 max-w-xl flex-1 truncate text-[0.95rem] leading-6 text-muted lg:block">
+                <span className="hidden min-w-0 max-w-xl flex-1 text-pretty text-[0.95rem] leading-6 text-muted lg:block">
                   {activeMode.description}
                 </span>
               </div>
