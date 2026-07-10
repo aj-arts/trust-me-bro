@@ -20,10 +20,35 @@ export const dashboardModels: ModelCatalogEntry[] = [
   { id: "llama-4-maverick", name: "Llama 4 Maverick", vendor: "Meta" },
 ];
 
-export const baseRunnerModelGroups: RunnerModelGroup[] = [
+const featuredRunnerModels: ModelCatalogEntry[] = [
+  { id: "openai/gpt-5.6-sol", name: "GPT-5.6 Sol", vendor: "OpenAI" },
+  { id: "x-ai/grok-4.5", name: "Grok 4.5", vendor: "xAI" },
+  { id: "anthropic/claude-opus-4.8", name: "Claude Opus 4.8", vendor: "Anthropic" },
+  { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", vendor: "Anthropic" },
+  { id: "openai/gpt-5.5", name: "GPT-5.5", vendor: "OpenAI" },
   {
-    label: "Dashboard",
-    models: dashboardModels,
+    id: "google/gemini-3.1-pro-preview",
+    name: "Gemini 3.1 Pro Preview",
+    vendor: "Google",
+  },
+  { id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2", vendor: "DeepSeek" },
+  { id: "meta-llama/llama-4-maverick", name: "Llama 4 Maverick", vendor: "Meta" },
+];
+
+const legacyRunnerModelAliases = new Map<string, string>([
+  ["claude-opus-4-8", "anthropic/claude-opus-4.8"],
+  ["claude-sonnet-4-5", "anthropic/claude-sonnet-4.5"],
+  ["gpt-5-5", "openai/gpt-5.5"],
+  ["gemini-3-1-pro", "google/gemini-3.1-pro-preview"],
+  ["deepseek-v3-2", "deepseek/deepseek-v3.2"],
+  ["qwen3-coder", "qwen/qwen3-coder:free"],
+  ["llama-4-maverick", "meta-llama/llama-4-maverick"],
+]);
+
+const runnerModelGroups: RunnerModelGroup[] = [
+  {
+    label: "Featured",
+    models: featuredRunnerModels,
   },
   {
     label: "Free",
@@ -59,9 +84,13 @@ export const baseRunnerModelGroups: RunnerModelGroup[] = [
   },
 ];
 
+export const baseRunnerModelGroups = dedupeRunnerModelGroups(runnerModelGroups);
+
 const knownModels = new Map(
-  baseRunnerModelGroups
-    .flatMap((group) => group.models)
+  [
+    ...dashboardModels,
+    ...baseRunnerModelGroups.flatMap((group) => group.models),
+  ]
     .map((model) => [model.id, model]),
 );
 
@@ -79,7 +108,9 @@ export function buildRunnerModelGroups(savedModelIds: string[]): RunnerModelGrou
   const baseIds = new Set(
     baseRunnerModelGroups.flatMap((group) => group.models.map((model) => model.id)),
   );
-  const savedModels = Array.from(new Set(savedModelIds))
+  const savedModels = Array.from(
+    new Set(savedModelIds.map((modelId) => legacyRunnerModelAliases.get(modelId) ?? modelId)),
+  )
     .filter((modelId) => !baseIds.has(modelId))
     .sort((a, b) => modelFromId(a).name.localeCompare(modelFromId(b).name))
     .map(modelFromId);
@@ -95,6 +126,24 @@ export function buildRunnerModelGroups(savedModelIds: string[]): RunnerModelGrou
     },
     ...baseRunnerModelGroups,
   ];
+}
+
+function dedupeRunnerModelGroups(groups: RunnerModelGroup[]): RunnerModelGroup[] {
+  const seenModelIds = new Set<string>();
+
+  return groups
+    .map((group) => ({
+      ...group,
+      models: group.models.filter((model) => {
+        if (seenModelIds.has(model.id)) {
+          return false;
+        }
+
+        seenModelIds.add(model.id);
+        return true;
+      }),
+    }))
+    .filter((group) => group.models.length > 0);
 }
 
 function titleize(value: string) {
