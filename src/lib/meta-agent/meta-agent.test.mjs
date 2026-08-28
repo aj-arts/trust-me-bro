@@ -10,6 +10,8 @@ import { aggregateScores, compareAggregates, scoreArtifact } from "./scoring.ts"
 import {
   DEFAULT_OPTIMIZER_LIMITS,
   DEFAULT_PROPOSAL_LIMITS,
+  MUTATION_CATEGORIES,
+  MUTATION_CATEGORIES_BY_MODE,
   ProposalValidationError,
 } from "./types.ts";
 import { validateAndApplyProposal } from "./validation.ts";
@@ -86,6 +88,16 @@ test("proposal parsing is strict and reports actionable paths", () => {
       error instanceof ProposalValidationError &&
       error.issues[0].path === "$" &&
       error.issues[0].code === "invalid_json",
+  );
+  for (const category of MUTATION_CATEGORIES) {
+    assert.equal(
+      parseStructuredProposal(JSON.stringify(proposal({ category }))).category,
+      category,
+    );
+  }
+  assert.deepEqual(
+    new Set(Object.values(MUTATION_CATEGORIES_BY_MODE).flat()),
+    new Set(MUTATION_CATEGORIES),
   );
   assert.throws(
     () => parseStructuredProposal(JSON.stringify({ ...proposal(), shell: "echo unsafe" })),
@@ -332,6 +344,12 @@ test("proposal generator binds only the default host fetch", async () => {
   await injectedGenerator.generate(request);
   assert.equal(injectedCalledWithoutReceiver, true);
   assert.ok(proposalInstructions.includes("Do not include budgetUsage"));
+  for (const category of MUTATION_CATEGORIES_BY_MODE["red-team"]) {
+    assert.ok(proposalInstructions.includes(category));
+  }
+  for (const category of MUTATION_CATEGORIES_BY_MODE["blue-team"]) {
+    assert.ok(!proposalInstructions.includes(category));
+  }
   assert.ok(!proposalInstructions.includes("must exactly report"));
   assert.ok(!proposalInstructions.includes("UTF-8 bytesAdded"));
   assert.ok(!proposalInstructions.includes("estimatedEditDistance"));

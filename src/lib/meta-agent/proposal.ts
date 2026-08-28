@@ -1,5 +1,6 @@
 import {
   ProposalValidationError,
+  MUTATION_CATEGORIES,
   type MutationBudgetUsage,
   type MutationCategory,
   type OptimizationMode,
@@ -10,16 +11,7 @@ import {
 } from "./types.ts";
 
 const modes = new Set<OptimizationMode>(["red-team", "blue-team"]);
-const categories = new Set<MutationCategory>([
-  "instruction-obfuscation",
-  "context-placement",
-  "fixture-content",
-  "task-clarity",
-  "safety-policy",
-  "scope-control",
-  "refusal-calibration",
-  "cost-reduction",
-]);
+const categories = new Set<MutationCategory>(MUTATION_CATEGORIES);
 
 export function parseStructuredProposal(output: string): ProposalDraft {
   let parsed: unknown;

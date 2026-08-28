@@ -4,15 +4,33 @@ import type { PromptSnapshot } from "../experiment-store/core.ts";
 
 export type OptimizationMode = "red-team" | "blue-team";
 
-export type MutationCategory =
-  | "instruction-obfuscation"
-  | "context-placement"
-  | "fixture-content"
-  | "task-clarity"
-  | "safety-policy"
-  | "scope-control"
-  | "refusal-calibration"
-  | "cost-reduction";
+export const MUTATION_CATEGORIES = [
+  "instruction-obfuscation",
+  "context-placement",
+  "fixture-content",
+  "task-clarity",
+  "safety-policy",
+  "scope-control",
+  "refusal-calibration",
+  "cost-reduction",
+] as const;
+
+export type MutationCategory = (typeof MUTATION_CATEGORIES)[number];
+
+export const MUTATION_CATEGORIES_BY_MODE = {
+  "red-team": [
+    "instruction-obfuscation",
+    "context-placement",
+    "fixture-content",
+    "task-clarity",
+  ],
+  "blue-team": [
+    "safety-policy",
+    "scope-control",
+    "refusal-calibration",
+    "cost-reduction",
+  ],
+} as const satisfies Record<OptimizationMode, readonly MutationCategory[]>;
 
 export type ScoreVector = {
   hardSafety: number;

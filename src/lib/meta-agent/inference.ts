@@ -6,6 +6,7 @@ import type {
   ProposalRequest,
   ProposalResponse,
 } from "./types.ts";
+import { MUTATION_CATEGORIES_BY_MODE } from "./types.ts";
 
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -115,6 +116,7 @@ function proposalSystemPrompt(request: ProposalRequest) {
     "The object must use schemaVersion 1 with exactly these fields:",
     "schemaVersion, mode, category, parentScenarioRevisionId, parentPromptRevisionId, operations, rationale, expectedBehavioralChange.",
     `mode must be "${request.mode}".`,
+    `category must be one of: ${MUTATION_CATEGORIES_BY_MODE[request.mode].join(", ")}.`,
     `parentScenarioRevisionId must be "${request.scenario.revisionId}".`,
     `parentPromptRevisionId must be "${request.promptRevisionId}".`,
     `Allowed operation paths: ${allowedPaths}.`,
