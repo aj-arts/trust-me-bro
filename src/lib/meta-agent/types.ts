@@ -155,7 +155,7 @@ export const DEFAULT_PROPOSAL_LIMITS: ProposalLimits = {
   maxScenarioBytes: 256 * 1024,
   maxPromptBytes: 32 * 1024,
   maxEditDistance: 4_000,
-  maxEditRatio: 0.4,
+  maxEditRatio: 2,
 };
 
 export const DEFAULT_BLUE_PROPOSAL_LIMITS: ProposalLimits = {

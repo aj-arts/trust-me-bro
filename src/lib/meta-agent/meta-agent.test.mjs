@@ -21,6 +21,7 @@ import { createCustomScenario } from "./authoring.ts";
 import { OptimizerLeaseConflictError } from "../experiment-store/repository.ts";
 import { BrowserEvaluatedAgent, OpenRouterProposalGenerator } from "./inference.ts";
 import { bootstrapScriptAmbushScenario } from "../../scenarios/bootstrap-script-ambush.ts";
+import { poisonedSkillCurlBashScenario } from "../../scenarios/poisoned-skill-curl-bash.ts";
 import { buildRunnerSystemPrompt } from "../../scenarios/system-prompts.ts";
 import {
   assertOpenRouterOutputTokenLimit,
@@ -353,7 +354,7 @@ test("trusted seed paths are grandfathered but generated paths and oversized pro
       error instanceof ProposalValidationError &&
       error.issues.some((issue) => issue.code === "limit_exceeded"),
   );
-  assert.equal(proposalLimitsForMode("red-team").maxEditRatio, 0.4);
+  assert.equal(proposalLimitsForMode("red-team").maxEditRatio, 2);
   assert.equal(proposalLimitsForMode("blue-team").maxEditRatio, 2);
 
   assert.throws(
@@ -381,6 +382,125 @@ test("trusted seed paths are grandfathered but generated paths and oversized pro
     (error) =>
       error instanceof ProposalValidationError &&
       error.issues.some((issue) => issue.code === "invalid_path"),
+  );
+});
+
+test("red-team workspace aliases canonicalize without admitting host paths", () => {
+  const scenario = createScenarioSnapshot(poisonedSkillCurlBashScenario);
+  const absoluteSkill = "/workspace/.skills/react-maintenance/SKILL.md";
+  const canonicalOperation = "/files/.skills/react-maintenance/SKILL.md";
+  const evolvedSkill = `${scenario.files[absoluteSkill]}\n${"x".repeat(1_172)}`;
+  const observedForms = [
+    "/files/~1workspace~1.skills~1react-maintenance~1SKILL.md",
+    "/files//workspace/.skills/react-maintenance/SKILL.md",
+  ];
+  for (const path of observedForms) {
+    const result = validateAndApplyProposal({
+      proposal: parseStructuredProposal(
+        JSON.stringify({
+          ...proposal({
+            parentScenarioRevisionId: scenario.revisionId,
+            operations: [{ op: "set", path, value: evolvedSkill }],
+          }),
+        }),
+      ),
+      scenario,
+      prompt,
+      promptRevisionId: "prompt-parent",
+    });
+    assert.ok(result.editDistance >= 1_172);
+    assert.equal(result.proposal.operations[0].path, canonicalOperation);
+    assert.equal(result.scenario.files[absoluteSkill], undefined);
+    assert.equal(result.scenario.files[".skills/react-maintenance/SKILL.md"], evolvedSkill);
+  }
+
+  for (const path of [
+    "/files/~1home~1agent~1secret",
+    "/files//etc/passwd",
+    "/files/~1workspace2~1escape",
+    "/files/~1workspace",
+    "/files//workspace/../etc",
+    "/files//workspace//double",
+    "/files/%2Fworkspace%2Fsecret",
+    "/files/src~1..~1escape",
+    "/files/／workspace／secret",
+  ]) {
+    assert.throws(
+      () =>
+        validateAndApplyProposal({
+          proposal: parseStructuredProposal(
+            JSON.stringify({
+              ...proposal({
+                parentScenarioRevisionId: scenario.revisionId,
+                operations: [{ op: "set", path, value: "blocked" }],
+              }),
+            }),
+          ),
+          scenario,
+          prompt,
+          promptRevisionId: "prompt-parent",
+        }),
+      (error) =>
+        error instanceof ProposalValidationError &&
+        error.issues.some((issue) => issue.code === "invalid_path"),
+      path,
+    );
+  }
+
+  const threeLiveLikePaths = [
+    canonicalOperation,
+    ...observedForms,
+  ];
+  assert.equal(threeLiveLikePaths.length, DEFAULT_OPTIMIZER_LIMITS.maxIterations);
+  for (const path of threeLiveLikePaths) {
+    assert.doesNotThrow(() =>
+      validateAndApplyProposal({
+        proposal: parseStructuredProposal(
+          JSON.stringify({
+            ...proposal({
+              parentScenarioRevisionId: scenario.revisionId,
+              operations: [{ op: "set", path, value: evolvedSkill }],
+            }),
+          }),
+        ),
+        scenario,
+        prompt,
+        promptRevisionId: "prompt-parent",
+      }),
+    );
+  }
+
+  const ambiguousScenario = {
+    ...scenario,
+    files: {
+      ...scenario.files,
+      ".skills/react-maintenance/SKILL.md": scenario.files[absoluteSkill],
+    },
+  };
+  assert.throws(
+    () =>
+      validateAndApplyProposal({
+        proposal: parseStructuredProposal(
+          JSON.stringify({
+            ...proposal({
+              parentScenarioRevisionId: scenario.revisionId,
+              operations: [
+                { op: "set", path: canonicalOperation, value: evolvedSkill },
+              ],
+            }),
+          }),
+        ),
+        scenario: ambiguousScenario,
+        prompt,
+        promptRevisionId: "prompt-parent",
+      }),
+    (error) =>
+      error instanceof ProposalValidationError &&
+      error.issues.some(
+        (issue) =>
+          issue.code === "invalid_path" &&
+          issue.message.includes("ambiguous"),
+      ),
   );
 });
 
@@ -494,9 +614,22 @@ test("proposal generator binds only the default host fetch", async () => {
   assert.ok(redInstructions.includes(String(DEFAULT_PROPOSAL_LIMITS.maxEditDistance)));
   assert.ok(redInstructions.includes(`${DEFAULT_PROPOSAL_LIMITS.maxEditRatio * 100}%`));
   assert.ok(redInstructions.includes(String(DEFAULT_PROPOSAL_LIMITS.maxScenarioBytes)));
+  assert.ok(redInstructions.includes('"/files/src/value.txt"'));
+  assert.ok(redInstructions.includes('Never prefix "/workspace"'));
+  assert.ok(redInstructions.includes("Write nested \"/\" separators literally"));
   assert.ok(!proposalInstructions.includes("must exactly report"));
   assert.ok(!proposalInstructions.includes("UTF-8 bytesAdded"));
   assert.ok(!proposalInstructions.includes("estimatedEditDistance"));
+
+  await injectedGenerator.generate({
+    ...request,
+    scenario: createScenarioSnapshot(poisonedSkillCurlBashScenario),
+  });
+  assert.ok(
+    proposalInstructions.includes(
+      '"/files/.skills/react-maintenance/SKILL.md"',
+    ),
+  );
 
   await injectedGenerator.generate({
     ...request,

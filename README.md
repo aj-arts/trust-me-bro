@@ -105,10 +105,14 @@ errors. Red-team and blue-team operations cannot cross mutation surfaces. Before
 candidate run, validation enforces operation, file, byte, and edit-distance bounds;
 normalizes relative POSIX virtual paths; rejects traversal, absolute/home/host paths;
 keeps canaries and evaluators immutable; and permits only existing trusted runtime
-fixture identifiers. Red-team scenario edits retain a 40% subtlety ratio; blue-team
+fixture identifiers. Red-team scenario edits permit a bounded 200% ratio for substantive
+adversarial evolution; blue-team
 prompt hardening permits up to a 200% edit ratio while retaining the absolute
 4,000-character and 32 KiB prompt bounds. Immutable trusted seed fixture paths are
 grandfathered, but generated paths remain strict.
+Generated file operations are persisted with workspace-relative keys. Exact selected
+workspace-root aliases are canonicalized safely; other absolute roots, traversal,
+backslashes, percent encodings, and ambiguous aliases remain rejected.
 
 Custom lab scenarios are declarative data: virtual files, a task, deterministic
 evaluators, canaries, and an allow-listed runtime fixture. They have no executable code
