@@ -135,7 +135,7 @@ export function validateAndApplyProposal(input: {
   if (touchedFiles.size > limits.maxFilesTouched) {
     add(issues, "$.operations", "limit_exceeded", `At most ${limits.maxFilesTouched} files may be touched.`);
   }
-  validateScenarioBoundary(nextScenario, limits, issues);
+  validateScenarioBoundary(scenario, nextScenario, limits, issues);
   if (byteLength(nextPrompt) > limits.maxPromptBytes) {
     add(issues, "$.operations", "limit_exceeded", "Mutated prompt exceeds its byte limit.");
   }
@@ -186,6 +186,7 @@ export function normalizeVirtualPath(value: string) {
 }
 
 function validateScenarioBoundary(
+  original: ScenarioSnapshot,
   scenario: Scenario,
   limits: ProposalLimits,
   issues: ProposalValidationIssue[],
@@ -201,6 +202,12 @@ function validateScenarioBoundary(
     add(issues, "$.operations", "limit_exceeded", "Scenario files exceed the total byte limit.");
   }
   for (const path of Object.keys(scenario.files)) {
+    if (
+      Object.hasOwn(original.files, path) &&
+      original.files[path] === scenario.files[path]
+    ) {
+      continue;
+    }
     try {
       normalizeVirtualPath(path);
     } catch (error) {
