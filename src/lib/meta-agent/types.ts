@@ -4,15 +4,33 @@ import type { PromptSnapshot } from "../experiment-store/core.ts";
 
 export type OptimizationMode = "red-team" | "blue-team";
 
-export type MutationCategory =
-  | "instruction-obfuscation"
-  | "context-placement"
-  | "fixture-content"
-  | "task-clarity"
-  | "safety-policy"
-  | "scope-control"
-  | "refusal-calibration"
-  | "cost-reduction";
+export const MUTATION_CATEGORIES = [
+  "instruction-obfuscation",
+  "context-placement",
+  "fixture-content",
+  "task-clarity",
+  "safety-policy",
+  "scope-control",
+  "refusal-calibration",
+  "cost-reduction",
+] as const;
+
+export type MutationCategory = (typeof MUTATION_CATEGORIES)[number];
+
+export const MUTATION_CATEGORIES_BY_MODE = {
+  "red-team": [
+    "instruction-obfuscation",
+    "context-placement",
+    "fixture-content",
+    "task-clarity",
+  ],
+  "blue-team": [
+    "safety-policy",
+    "scope-control",
+    "refusal-calibration",
+    "cost-reduction",
+  ],
+} as const satisfies Record<OptimizationMode, readonly MutationCategory[]>;
 
 export type ScoreVector = {
   hardSafety: number;
@@ -80,6 +98,10 @@ export type StructuredProposal = {
   budgetUsage: MutationBudgetUsage;
 };
 
+export type ProposalDraft = Omit<StructuredProposal, "budgetUsage"> & {
+  budgetUsage?: MutationBudgetUsage;
+};
+
 export type ProposalValidationIssue = {
   path: string;
   code:
@@ -98,11 +120,17 @@ export type ProposalValidationIssue = {
 
 export class ProposalValidationError extends Error {
   readonly issues: ProposalValidationIssue[];
+  readonly proposal?: StructuredProposal;
 
-  constructor(message: string, issues: ProposalValidationIssue[]) {
+  constructor(
+    message: string,
+    issues: ProposalValidationIssue[],
+    proposal?: StructuredProposal,
+  ) {
     super(message);
     this.name = "ProposalValidationError";
     this.issues = issues;
+    this.proposal = proposal;
   }
 }
 
@@ -127,8 +155,20 @@ export const DEFAULT_PROPOSAL_LIMITS: ProposalLimits = {
   maxScenarioBytes: 256 * 1024,
   maxPromptBytes: 32 * 1024,
   maxEditDistance: 4_000,
-  maxEditRatio: 0.4,
+  maxEditRatio: 2,
 };
+
+export const DEFAULT_BLUE_PROPOSAL_LIMITS: ProposalLimits = {
+  ...DEFAULT_PROPOSAL_LIMITS,
+  maxEditRatio: 2,
+};
+
+export function proposalLimitsForMode(
+  mode: OptimizationMode,
+  configured?: ProposalLimits,
+) {
+  return configured ?? (mode === "blue-team" ? DEFAULT_BLUE_PROPOSAL_LIMITS : DEFAULT_PROPOSAL_LIMITS);
+}
 
 export type ProposalRequest = {
   mode: OptimizationMode;
@@ -173,23 +213,27 @@ export type OptimizerLimits = {
   maxEvaluatedRuns: number;
   maxConcurrentRuns: 1;
   maxProposalTokens: number;
+  maxTokensPerProposal: number;
   maxEvaluatedAgentTokens: number;
   maxTokensPerEvaluatedRun: number;
+  maxReservedTokensPerEvaluatedRun: number;
   maxEstimatedSpendUsd: number;
   estimatedProposalCostUsd: number;
   estimatedEvaluatedRunCostUsd: number;
 };
 
 export const DEFAULT_OPTIMIZER_LIMITS: OptimizerLimits = {
-  maxIterations: 1,
-  maxCandidates: 1,
+  maxIterations: 3,
+  maxCandidates: 3,
   repeats: 1,
-  maxEvaluatedRuns: 2,
+  maxEvaluatedRuns: 4,
   maxConcurrentRuns: 1,
-  maxProposalTokens: 1_200,
-  maxEvaluatedAgentTokens: 8_000,
-  maxTokensPerEvaluatedRun: 4_000,
-  maxEstimatedSpendUsd: 0.1,
+  maxProposalTokens: 393_216,
+  maxTokensPerProposal: 131_072,
+  maxEvaluatedAgentTokens: 4_194_304,
+  maxTokensPerEvaluatedRun: 131_072,
+  maxReservedTokensPerEvaluatedRun: 1_048_576,
+  maxEstimatedSpendUsd: 25,
   estimatedProposalCostUsd: 0.02,
   estimatedEvaluatedRunCostUsd: 0.04,
 };
@@ -209,6 +253,7 @@ export type BudgetSnapshot = {
 
 export type OptimizerPhase =
   | "loading"
+  | "waiting"
   | "baseline"
   | "proposing"
   | "validating"

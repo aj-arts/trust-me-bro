@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  assertMetaAgentLabAccess,
   requirePromptRevision,
   requireScenarioRevision,
   validateRevisionPayload,
@@ -20,6 +21,7 @@ export const createScenario = mutation({
     snapshotJson: v.string(),
   },
   handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
     const { parsed, size } = await validateRevisionPayload(args.snapshotJson, args.contentHash);
     if (
       typeof parsed !== "object" ||
@@ -77,6 +79,7 @@ export const createPrompt = mutation({
     snapshotJson: v.string(),
   },
   handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
     const { parsed, size } = await validateRevisionPayload(args.snapshotJson, args.contentHash);
     if (
       typeof parsed !== "object" ||

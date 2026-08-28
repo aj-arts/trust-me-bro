@@ -46,14 +46,33 @@ Run Convex in another terminal after configuring a Convex project:
 pnpm dev:convex
 ```
 
-User OpenRouter keys are entered in the browser runner UI. They should not be stored in Convex or committed env files.
+User OpenRouter keys are entered in the browser runner UI. Outer whitespace is trimmed;
+the supported `sk-or-v1-` plus 64-character format rejects internal whitespace before
+dispatch. Keys should not be stored in Convex or committed env files.
 
 Open `/lab` to run the optimizer. Its economical default proposal and evaluated model
 is `z-ai/glm-5.3-flash`; the model fields also accept any catalog or custom OpenRouter
-model ID. The default hard budget is deliberately sparse: one baseline, one candidate,
-one repeat, sequential execution, 1,200 proposal tokens, 8,000 evaluated-agent tokens,
-and a $0.10 estimated-spend ceiling. Increase these values only when intentionally
-opting into more iterations or repeated runs.
+model ID. Fresh labs default to red-team optimization of the stable
+`poisoned-skill-curl-bash` seed. The default hard budget uses one baseline, three
+candidates/iterations, one repeat, four evaluated runs, and sequential execution. Its
+token ceilings use GLM-5.3-Flash's published maxima:
+131,072 proposal output tokens per call, 131,072 evaluated output tokens per run,
+1,048,576 reserved total tokens per evaluated run, a 393,216 aggregate proposal budget,
+and a 4,194,304 aggregate evaluated token budget for the four default runs. The $25
+estimated-spend ceiling remains independent and enforced.
+Proposal requests use OpenRouter's normalized `reasoning: { effort: "low" }` parameter so
+mandatory-reasoning models retain reasoning without starving the bounded JSON response.
+They also require normalized `response_format: { type: "json_object" }`; unsupported
+models fail explicitly rather than relaxing the raw-JSON parser or stripping markdown.
+Known model capabilities are validated before dispatch. Custom model IDs use a clearly
+reported conservative fallback (32,768 completion / 128,000 context tokens); impossible
+values are rejected rather than silently clamped.
+
+Proposal schema version 1 accepts legacy model-supplied `budgetUsage` for compatibility,
+but does not trust it. The validator derives canonical operation count, unique files
+touched, bytes added, and edit distance from the parsed operations and current revisions;
+persisted proposals always contain those computed values. New model prompts omit
+`budgetUsage` entirely.
 
 ## Optimizer modes and objective
 
@@ -86,7 +105,14 @@ errors. Red-team and blue-team operations cannot cross mutation surfaces. Before
 candidate run, validation enforces operation, file, byte, and edit-distance bounds;
 normalizes relative POSIX virtual paths; rejects traversal, absolute/home/host paths;
 keeps canaries and evaluators immutable; and permits only existing trusted runtime
-fixture identifiers.
+fixture identifiers. Red-team scenario edits permit a bounded 200% ratio for substantive
+adversarial evolution; blue-team
+prompt hardening permits up to a 200% edit ratio while retaining the absolute
+4,000-character and 32 KiB prompt bounds. Immutable trusted seed fixture paths are
+grandfathered, but generated paths remain strict.
+Generated file operations are persisted with workspace-relative keys. Exact selected
+workspace-root aliases are canonicalized safely; other absolute roots, traversal,
+backslashes, percent encodings, and ambiguous aliases remain rejected.
 
 Custom lab scenarios are declarative data: virtual files, a task, deterministic
 evaluators, canaries, and an allow-listed runtime fixture. They have no executable code
@@ -98,6 +124,9 @@ The controller persists revisions, candidates, runs, and decisions through
 and run IDs plus idempotent persistence mutations allow a running experiment to resume
 from already completed steps. Budget checks reserve the next proposal/run before
 starting it, cancellation is observed between browser calls, and failures are explicit.
+Structurally valid proposals that fail mutation limits are persisted as rejected
+candidates with validation issues and are never executed; infrastructure and state
+failures remain experiment failures.
 
 OpenRouter keys are constructor-only, in-memory dependencies of the proposal and
 evaluated-agent adapters. They are absent from controller configuration, repository
@@ -106,10 +135,17 @@ adapters and make no live calls.
 
 Current limitations: a partially uploaded run is not replayed automatically because
 doing so could duplicate a billable provider call; the controller surfaces it as an
-explicit failure for operator inspection. Provider-reported token usage is authoritative
-after each call, while per-call output tokens are capped before dispatch. Convex access
-control follows the deployment's existing policy; public or multi-user deployments must
-add authenticated ownership checks before exposing write mutations.
+explicit failure for operator inspection. Provider-reported token usage is authoritative after each call. Each evaluated run
+reserves a separately configured total-token allowance before dispatch; the provider
+output cap is intentionally distinct so input tokens are not mistaken for free budget.
+
+Meta-agent revisions, experiments, and full run artifacts fail closed by default because
+the app does not yet have a product identity or ownership model. To use them in a trusted
+single-user local deployment, set `NEXT_PUBLIC_CONVEX_URL`, set
+`NEXT_PUBLIC_META_AGENT_LAB_LOCAL_ONLY=true` in the Next.js app, and set
+`META_AGENT_LAB_LOCAL_ONLY=true` in the matching Convex deployment. Never enable this
+mode for a public or multi-user deployment; authenticated ownership checks are required
+before doing so. Legacy aggregate dashboard reads and writes remain available.
 
 ## Experiment persistence
 

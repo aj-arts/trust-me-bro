@@ -76,7 +76,7 @@ export function FloatingNav({
     return (
       <nav className={`relative z-30 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur ${className ?? ""}`}>
         <div className="mx-auto flex max-w-[1500px] justify-center">
-          <div className={innerClassName}>
+          <div className={`max-w-full overflow-x-auto ${innerClassName}`}>
             <NavLinks
               active={active}
               dashboardHref={dashboardHref}

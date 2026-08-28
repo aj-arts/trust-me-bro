@@ -8,6 +8,7 @@ import { runPiAgent, type PiRunnerRuntime } from "./piRunner.ts";
 import { createScenarioSnapshot } from "./scenarioSnapshot.ts";
 import { createTraceRecorder, type RunnerTraceEvent } from "./trace.ts";
 import type { RunArtifact, ScenarioRunResult } from "./types.ts";
+import { runArtifactFailed } from "./runStatus.ts";
 
 export type RunScenarioInput = {
   scenario: Scenario;
@@ -104,15 +105,8 @@ export async function runScenario(input: RunScenarioInput): Promise<ScenarioRunR
     },
     evaluation,
   };
-  const failed =
-    result.errors.some(
-      (error) =>
-        error.phase === "setup" || error.phase === "provider" || error.phase === "runner",
-    ) ||
-    result.stopReasons.some((reason) => reason === "error" || reason === "aborted");
-
   return {
-    status: failed ? "failed" : "completed",
+    status: runArtifactFailed(artifact) ? "failed" : "completed",
     artifact,
   };
 }

@@ -4,6 +4,7 @@ import {
   ARTIFACT_CHUNK_MAX_BYTES,
   ARTIFACT_MAX_CHUNKS,
   REVISION_MAX_BYTES,
+  assertMetaAgentLabEnabled,
   assertNoPersistedSecrets,
   byteLength,
   reassembleArtifactChunks,
@@ -13,7 +14,16 @@ import { stableStringify } from "../src/lib/browser-runner/scenarioSnapshot";
 
 type DatabaseReader = QueryCtx["db"] | MutationCtx["db"];
 
+export function assertMetaAgentLabAccess() {
+  try {
+    assertMetaAgentLabEnabled();
+  } catch (error) {
+    throw new ConvexError(error instanceof Error ? error.message : "Meta-agent persistence is disabled.");
+  }
+}
+
 export async function requireScenarioRevision(db: DatabaseReader, revisionId: string) {
+  assertMetaAgentLabAccess();
   const revision = await db
     .query("scenarioRevisions")
     .withIndex("by_revision_id", (q) => q.eq("revisionId", revisionId))
@@ -23,6 +33,7 @@ export async function requireScenarioRevision(db: DatabaseReader, revisionId: st
 }
 
 export async function requirePromptRevision(db: DatabaseReader, revisionId: string) {
+  assertMetaAgentLabAccess();
   const revision = await db
     .query("promptRevisions")
     .withIndex("by_revision_id", (q) => q.eq("revisionId", revisionId))
@@ -32,6 +43,7 @@ export async function requirePromptRevision(db: DatabaseReader, revisionId: stri
 }
 
 export async function requireExperiment(db: DatabaseReader, experimentId: string) {
+  assertMetaAgentLabAccess();
   const experiment = await db
     .query("experiments")
     .withIndex("by_experiment_id", (q) => q.eq("experimentId", experimentId))
@@ -41,6 +53,7 @@ export async function requireExperiment(db: DatabaseReader, experimentId: string
 }
 
 export async function requireCandidate(db: DatabaseReader, candidateId: string) {
+  assertMetaAgentLabAccess();
   const candidate = await db
     .query("candidates")
     .withIndex("by_candidate_id", (q) => q.eq("candidateId", candidateId))
@@ -50,6 +63,7 @@ export async function requireCandidate(db: DatabaseReader, candidateId: string) 
 }
 
 export async function requireRun(db: DatabaseReader, runId: string) {
+  assertMetaAgentLabAccess();
   const run = await db
     .query("runs")
     .withIndex("by_run_id", (q) => q.eq("runId", runId))

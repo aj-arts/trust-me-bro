@@ -11,6 +11,7 @@
 import type * as experiments from "../experiments.js";
 import type * as revisions from "../revisions.js";
 import type * as runs from "../runs.js";
+import type * as storageHelpers from "../storageHelpers.js";
 
 import type {
   ApiFromModules,
@@ -22,6 +23,7 @@ declare const fullApi: ApiFromModules<{
   experiments: typeof experiments;
   revisions: typeof revisions;
   runs: typeof runs;
+  storageHelpers: typeof storageHelpers;
 }>;
 
 /**

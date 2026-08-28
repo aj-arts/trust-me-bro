@@ -36,9 +36,27 @@ export class OptimizerBudget {
     }
   }
 
+  assertCanProposeAndRun(runCount: number) {
+    this.assertAdditional({
+      iterations: 1,
+      candidates: 1,
+      evaluatedRuns: runCount,
+      evaluatedAgentTokens: runCount * this.limits.maxReservedTokensPerEvaluatedRun,
+      estimatedSpendUsd:
+        this.limits.estimatedProposalCostUsd +
+        runCount * this.limits.estimatedEvaluatedRunCostUsd,
+    });
+    if (this.snapshot().remaining.proposalTokens < 1) {
+      throw new Error("Optimizer budget exhausted: proposalTokens has no remaining capacity.");
+    }
+  }
+
   proposalTokenAllowance() {
     this.assertCanPropose();
-    return Math.floor(this.snapshot().remaining.proposalTokens);
+    return Math.min(
+      this.limits.maxTokensPerProposal,
+      Math.floor(this.snapshot().remaining.proposalTokens),
+    );
   }
 
   consumeProposal(tokens: number, costUsd: number) {
@@ -53,7 +71,7 @@ export class OptimizerBudget {
   assertCanRun(count = 1) {
     this.assertAdditional({
       evaluatedRuns: count,
-      evaluatedAgentTokens: count * this.limits.maxTokensPerEvaluatedRun,
+      evaluatedAgentTokens: count * this.limits.maxReservedTokensPerEvaluatedRun,
       estimatedSpendUsd: count * this.limits.estimatedEvaluatedRunCostUsd,
     });
   }
@@ -111,8 +129,10 @@ function validateLimits(limits: OptimizerLimits) {
     "maxEvaluatedRuns",
     "maxConcurrentRuns",
     "maxProposalTokens",
+    "maxTokensPerProposal",
     "maxEvaluatedAgentTokens",
     "maxTokensPerEvaluatedRun",
+    "maxReservedTokensPerEvaluatedRun",
   ];
   for (const field of integerFields) {
     if (!Number.isInteger(limits[field]) || limits[field] <= 0) {
@@ -127,6 +147,9 @@ function validateLimits(limits: OptimizerLimits) {
   }
   if (limits.maxConcurrentRuns !== 1) {
     throw new Error("Only sequential evaluated runs are supported.");
+  }
+  if (limits.maxReservedTokensPerEvaluatedRun < limits.maxTokensPerEvaluatedRun) {
+    throw new Error("Evaluated-run token reservation cannot be smaller than its output-token cap.");
   }
   for (const field of [
     "maxEstimatedSpendUsd",

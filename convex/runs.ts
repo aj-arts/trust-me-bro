@@ -2,6 +2,9 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import { ConvexError, v } from "convex/values";
 import {
   assertRunTransition,
+  assertComparableStoredRun,
+  assertStoredArtifactMatchesRun,
+  shouldAssignBaseline,
   assertNoPersistedSecrets,
   byteLength,
   parseStoredRunArtifact,
@@ -9,6 +12,10 @@ import {
 } from "../src/lib/experiment-store/core";
 import type { RunArtifact } from "../src/lib/browser-runner/types";
 import { stableStringify } from "../src/lib/browser-runner/scenarioSnapshot";
+import {
+  runArtifactFailed,
+  runArtifactFailureReason,
+} from "../src/lib/browser-runner/runStatus";
 import {
   loadArtifactJson,
   requireCandidate,
@@ -84,6 +91,7 @@ export const start = mutation({
         model: v.string(),
         systemPromptMode,
         startedAt: v.number(),
+        attemptId: v.string(),
       },
       handler: async (ctx, args) => {
         if (!args.runId.trim() || !args.model.trim()) throw new ConvexError("Run ID and model are required.");
@@ -92,17 +100,26 @@ export const start = mutation({
           .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
           .unique();
         if (existing) {
-          if (
-            existing.status === "running" &&
+          const metadataMatches =
             existing.source === args.source &&
             existing.experimentId === args.experimentId &&
             existing.candidateId === args.candidateId &&
             existing.scenarioRevisionId === args.scenarioRevisionId &&
             existing.promptRevisionId === args.promptRevisionId &&
             existing.model === args.model &&
-            existing.systemPromptMode === args.systemPromptMode
+            existing.systemPromptMode === args.systemPromptMode;
+          if (
+            existing.status === "running" &&
+            existing.attemptId === args.attemptId &&
+            metadataMatches
           ) {
-            return existing._id;
+            return { state: "started" as const, id: existing._id };
+          }
+          if (existing.status === "completed" && metadataMatches) {
+            return { state: "completed" as const, id: existing._id };
+          }
+          if (existing.status === "running") {
+            throw new ConvexError(`RUN_LEASE_CONFLICT: Run ${args.runId} is already owned.`);
           }
           throw new ConvexError(`Run ${args.runId} already exists with different state or metadata.`);
         }
@@ -143,22 +160,15 @@ export const start = mutation({
           ) {
             throw new ConvexError("Baseline run revisions do not match the experiment.");
           }
-          if (!args.candidateId && !experiment.baselineRunId) {
-            await ctx.db.patch(experiment._id, {
-              baselineRunId: args.runId,
-              updatedAt: Date.now(),
-            });
-          } else if (!args.candidateId && experiment.baselineRunId !== args.runId) {
-            // Repeats are represented by runs; baselineRunId remains the first paired baseline.
-          }
         } else if (args.experimentId || args.candidateId) {
           throw new ConvexError("Benchmark runs cannot reference experiments or candidates.");
         }
-        return await ctx.db.insert("runs", {
+        const id = await ctx.db.insert("runs", {
           schemaVersion: 2,
           runId: args.runId,
           source: args.source,
           status: "running",
+          attemptId: args.attemptId,
           experimentId: args.experimentId,
           candidateId: args.candidateId,
           scenarioRevisionId: args.scenarioRevisionId,
@@ -174,6 +184,7 @@ export const start = mutation({
           canaryHits: [],
           traceEventCount: 0,
         });
+        return { state: "started" as const, id };
       },
     });
 
@@ -274,10 +285,13 @@ export const start = mutation({
         reason: v.union(
           v.literal("artifact_too_large"),
           v.literal("artifact_serialization_failed"),
+          v.literal("execution_failed"),
+          v.literal("cancelled"),
         ),
       },
       handler: async (ctx, args) => {
         const run = await requireRun(ctx.db, args.runId);
+        if (run.status === "failed") return run._id;
         try {
           assertRunTransition(run.status ?? "completed", "failed");
         } catch (error) {
@@ -292,7 +306,11 @@ export const start = mutation({
           failureMessage:
             args.reason === "artifact_too_large"
               ? "Run artifact exceeded the persistence size limit."
-              : "Run artifact could not be serialized for persistence.",
+              : args.reason === "artifact_serialization_failed"
+                ? "Run artifact could not be serialized for persistence."
+                : args.reason === "cancelled"
+                  ? "Run execution was cancelled."
+                  : "Run execution failed before an artifact could be finalized.",
         });
         return run._id;
       },
@@ -308,16 +326,15 @@ export const start = mutation({
         if (run.status === "running" || !run.artifactChunkCount) {
           throw new ConvexError("Run artifact is not available until persistence completes.");
         }
-        const [scenarioRevision, promptRevision, artifactJson] = await Promise.all([
+        const [scenarioRevision, promptRevision] = await Promise.all([
           requireScenarioRevision(ctx.db, run.scenarioRevisionId),
           requirePromptRevision(ctx.db, run.promptRevisionId),
-          loadArtifactJson(ctx.db, args.runId),
         ]);
         return {
           run,
           scenarioRevision,
           promptRevision,
-          artifact: parseStoredRunArtifact(artifactJson),
+          artifact: await loadValidatedArtifact(ctx, run),
         };
       },
     });
@@ -361,43 +378,14 @@ export const start = mutation({
       } catch (error) {
         throw new ConvexError(error instanceof Error ? error.message : "Invalid run transition.");
       }
-      const artifactJson = await loadArtifactJson(ctx.db, runId);
-      const artifact = parseStoredRunArtifact(artifactJson);
-      if (
-        artifact.runId !== runId ||
-        artifact.model !== run.model ||
-        artifact.scenario.revisionId !== run.scenarioRevisionId
-      ) {
-        throw new ConvexError("Run artifact identity does not match its run record.");
-      }
-      const [scenarioRevision, promptRevision] = await Promise.all([
-        requireScenarioRevision(ctx.db, run.scenarioRevisionId ?? ""),
-        requirePromptRevision(ctx.db, run.promptRevisionId ?? ""),
-      ]);
-      if (scenarioRevision.snapshotJson !== stableStringify(artifact.scenario)) {
-        throw new ConvexError("Run artifact scenario does not match its scenario revision.");
-      }
-      const promptSnapshot = JSON.parse(promptRevision.snapshotJson) as { systemPrompt?: unknown };
-      if (promptSnapshot.systemPrompt !== artifact.effectiveSystemPrompt) {
-        throw new ConvexError("Run artifact prompt does not match its prompt revision.");
-      }
-      if (stableStringify(redactForPersistence(artifact)) !== artifactJson) {
-        throw new ConvexError("Run artifact was not sanitized at the persistence boundary.");
-      }
-      const artifactFailed =
-        artifact.errors.some((error) =>
-          error.phase === "setup" || error.phase === "provider" || error.phase === "runner",
-        ) || artifact.stopReasons.some((reason) => reason === "error" || reason === "aborted");
+      const artifact = await loadValidatedArtifact(ctx, run);
+      const artifactFailed = runArtifactFailed(artifact);
       if ((status === "failed") !== artifactFailed) {
         throw new ConvexError("Run terminal state does not match its structured artifact.");
       }
       const persistedFailureMessage =
         status === "failed"
-          ? artifact.errors.find((error) =>
-              error.phase === "setup" || error.phase === "provider" || error.phase === "runner",
-            )?.message ??
-            artifact.stopReasons.find((reason) => reason === "error" || reason === "aborted") ??
-            "Run failed."
+          ? runArtifactFailureReason(artifact)
           : failureMessage;
       const canaryHits = canaryHitsForArtifact(artifact);
       await ctx.db.patch(run._id, {
@@ -410,11 +398,14 @@ export const start = mutation({
         canaryTriggered: canaryHits.length > 0,
         canaryHits,
         traceEventCount: artifact.traceEvents.length,
-        artifactByteLength: byteLength(artifactJson),
+        artifactByteLength: byteLength(stableStringify(redactForPersistence(artifact))),
       });
       if (run.experimentId && !run.candidateId && status === "completed") {
         const experiment = await requireExperiment(ctx.db, run.experimentId);
-        if (!experiment.baselineRunId) {
+        const existingBaseline = experiment.baselineRunId
+          ? await requireRun(ctx.db, experiment.baselineRunId)
+          : undefined;
+        if (shouldAssignBaseline(existingBaseline?.status)) {
           await ctx.db.patch(experiment._id, { baselineRunId: runId, updatedAt: Date.now() });
         }
       }
@@ -435,7 +426,42 @@ export const start = mutation({
 
     async function loadComparableRun(ctx: QueryCtx, runId: string) {
       const run = await requireRun(ctx.db, runId);
-      return { run, artifact: parseStoredRunArtifact(await loadArtifactJson(ctx.db, runId)) };
+      try {
+        assertComparableStoredRun(run);
+      } catch (error) {
+        throw new ConvexError(error instanceof Error ? error.message : "Run cannot be compared.");
+      }
+      return { run, artifact: await loadValidatedArtifact(ctx, run) };
+    }
+
+    async function loadValidatedArtifact(
+      ctx: QueryCtx | MutationCtx,
+      run: Awaited<ReturnType<typeof requireRun>>,
+    ) {
+      if (!run.runId || !run.scenarioRevisionId || !run.promptRevisionId) {
+        throw new ConvexError("Legacy aggregate runs do not contain a full artifact.");
+      }
+      const artifactJson = await loadArtifactJson(ctx.db, run.runId);
+      const artifact = parseStoredRunArtifact(artifactJson);
+      const [scenarioRevision, promptRevision] = await Promise.all([
+        requireScenarioRevision(ctx.db, run.scenarioRevisionId),
+        requirePromptRevision(ctx.db, run.promptRevisionId),
+      ]);
+      const promptSnapshot = JSON.parse(promptRevision.snapshotJson) as { systemPrompt?: unknown };
+      try {
+        assertStoredArtifactMatchesRun({
+          artifact,
+          artifactJson,
+          runId: run.runId,
+          model: run.model,
+          scenarioRevisionId: run.scenarioRevisionId,
+          scenarioSnapshotJson: scenarioRevision.snapshotJson,
+          promptSystemPrompt: promptSnapshot.systemPrompt,
+        });
+      } catch (error) {
+        throw new ConvexError(error instanceof Error ? error.message : "Run artifact is invalid.");
+      }
+      return artifact;
     }
 
     function summarizeArtifact(artifact: RunArtifact) {

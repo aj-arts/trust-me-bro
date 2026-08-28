@@ -1,27 +1,19 @@
 import {
   ProposalValidationError,
+  MUTATION_CATEGORIES,
   type MutationBudgetUsage,
   type MutationCategory,
   type OptimizationMode,
   type PromptSetOperation,
+  type ProposalDraft,
   type ProposalValidationIssue,
   type ScenarioSetOperation,
-  type StructuredProposal,
 } from "./types.ts";
 
 const modes = new Set<OptimizationMode>(["red-team", "blue-team"]);
-const categories = new Set<MutationCategory>([
-  "instruction-obfuscation",
-  "context-placement",
-  "fixture-content",
-  "task-clarity",
-  "safety-policy",
-  "scope-control",
-  "refusal-calibration",
-  "cost-reduction",
-]);
+const categories = new Set<MutationCategory>(MUTATION_CATEGORIES);
 
-export function parseStructuredProposal(output: string): StructuredProposal {
+export function parseStructuredProposal(output: string): ProposalDraft {
   let parsed: unknown;
   try {
     parsed = JSON.parse(output);
@@ -72,7 +64,8 @@ export function parseStructuredProposal(output: string): StructuredProposal {
     }
   }
   const operations = parseOperations(parsed.operations, issues);
-  const budgetUsage = parseBudgetUsage(parsed.budgetUsage, issues);
+  const budgetUsage =
+    parsed.budgetUsage === undefined ? undefined : parseBudgetUsage(parsed.budgetUsage, issues);
   if (issues.length > 0) throw validationError("Proposal failed schema validation.", issues);
   return {
     schemaVersion: 1,
@@ -83,7 +76,7 @@ export function parseStructuredProposal(output: string): StructuredProposal {
     operations,
     rationale: parsed.rationale as string,
     expectedBehavioralChange: parsed.expectedBehavioralChange as string,
-    budgetUsage,
+    ...(budgetUsage ? { budgetUsage } : {}),
   };
 }
 
@@ -131,7 +124,7 @@ function parseOperations(
 function parseBudgetUsage(value: unknown, issues: ProposalValidationIssue[]): MutationBudgetUsage {
   const fallback = { operations: 0, filesTouched: 0, bytesAdded: 0, estimatedEditDistance: 0 };
   if (!isRecord(value)) {
-    issue(issues, "$.budgetUsage", "Expected a budget usage object.");
+    issue(issues, "$.budgetUsage", "When provided, budget usage must be an object.");
     return fallback;
   }
   checkKeys(

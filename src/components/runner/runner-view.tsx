@@ -31,7 +31,11 @@ import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
 import type { ScenarioRunResult, VirtualFileChange } from "@/lib/browser-runner/types";
 import { FloatingNav } from "@/components/floating-nav";
-import { useConvexConfigured } from "@/components/providers/convex-client-provider";
+import {
+  useConvexConfigured,
+  useMetaAgentLabConfigured,
+} from "@/components/providers/convex-client-provider";
+import { normalizeOpenRouterApiKey } from "@/lib/openrouter-capabilities";
 import { buildRunnerModelGroups } from "@/lib/model-catalog";
 import {
   buildRunnerSystemPrompt,
@@ -66,15 +70,30 @@ const SYSTEM_PROMPT_FILE_DIRECTORY = "/.runner";
 
 export function RunnerView({ scenario }: RunnerViewProps) {
   const convexConfigured = useConvexConfigured();
+  const artifactPersistenceConfigured = useMetaAgentLabConfigured();
 
   if (convexConfigured) {
-    return <RunnerViewWithSavedModels scenario={scenario} />;
+    return (
+      <RunnerViewWithSavedModels
+        scenario={scenario}
+        artifactPersistenceConfigured={artifactPersistenceConfigured}
+      />
+    );
   }
 
-  return <RunnerViewShell scenario={scenario} convexConfigured={false} savedModelIds={[]} />;
+  return (
+    <RunnerViewShell
+      scenario={scenario}
+      artifactPersistenceConfigured={false}
+      savedModelIds={[]}
+    />
+  );
 }
 
-function RunnerViewWithSavedModels({ scenario }: RunnerViewProps) {
+function RunnerViewWithSavedModels({
+  scenario,
+  artifactPersistenceConfigured,
+}: RunnerViewProps & { artifactPersistenceConfigured: boolean }) {
   const savedDashboardRuns = useQuery(api.runs.listForDashboard, {});
   const savedModelIds = useMemo(
     () => Array.from(new Set((savedDashboardRuns ?? []).map((run) => run.model))),
@@ -84,25 +103,27 @@ function RunnerViewWithSavedModels({ scenario }: RunnerViewProps) {
   return (
     <RunnerViewShell
       scenario={scenario}
-      convexConfigured
+      artifactPersistenceConfigured={artifactPersistenceConfigured}
       savedModelIds={savedModelIds}
     />
   );
 }
 
 type RunnerViewShellProps = RunnerViewProps & {
-  convexConfigured: boolean;
+  artifactPersistenceConfigured: boolean;
   savedModelIds: string[];
 };
 
 function RunnerViewShell({
   scenario,
-  convexConfigured,
+  artifactPersistenceConfigured,
   savedModelIds,
 }: RunnerViewShellProps) {
   const [openRouterKey, setOpenRouterKey] = useState("");
+  const [credentialError, setCredentialError] = useState<string>();
   const [model, setModel] = useState("openrouter/free");
   const [systemPromptMode, setSystemPromptMode] = useState(DEFAULT_SYSTEM_PROMPT_MODE);
+  const [runSystemPromptMode, setRunSystemPromptMode] = useState(DEFAULT_SYSTEM_PROMPT_MODE);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [traceEvents, setTraceEvents] = useState<RunnerTraceEvent[]>([]);
   const [runState, setRunState] = useState<RunState>("idle");
@@ -166,7 +187,15 @@ function RunnerViewShell({
   }, [selectedFile, systemPromptFile.path]);
 
   async function handleStartRun() {
-    if (!openRouterKey.trim() || runState === "running") {
+    if (runState === "running") {
+      return;
+    }
+    let apiKey: string;
+    try {
+      apiKey = normalizeOpenRouterApiKey(openRouterKey);
+      setCredentialError(undefined);
+    } catch (error) {
+      setCredentialError(error instanceof Error ? error.message : "OpenRouter key is invalid.");
       return;
     }
 
@@ -176,13 +205,14 @@ function RunnerViewShell({
     setRunResult(null);
     setTraceEvents([]);
     setRunKey((current) => current + 1);
+    setRunSystemPromptMode(systemPromptMode);
 
     try {
       const { runScenario } = await import("@/lib/browser-runner/runScenario");
 
       const result = await runScenario({
         scenario,
-        openRouterKey,
+        openRouterKey: apiKey,
         model,
         systemPromptMode,
         onTrace: (event) => {
@@ -277,11 +307,17 @@ function RunnerViewShell({
               <input
                 id="openrouter-key"
                 value={openRouterKey}
-                onChange={(event) => setOpenRouterKey(event.target.value)}
+                onChange={(event) => {
+                  setOpenRouterKey(event.target.value);
+                  setCredentialError(undefined);
+                }}
                 type="password"
                 placeholder="sk-or-..."
                 className="mt-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
               />
+              {credentialError ? (
+                <p role="alert" className="mt-2 text-xs text-danger">{credentialError}</p>
+              ) : null}
 
               <label className="mt-4 block text-sm font-medium" htmlFor="model">
                 Model
@@ -327,10 +363,10 @@ function RunnerViewShell({
               />
               <SaveRunControl
                 key={runKey}
-                configured={convexConfigured}
+                configured={artifactPersistenceConfigured}
                 scenario={scenario}
                 model={model}
-                systemPromptMode={systemPromptMode}
+                systemPromptMode={runSystemPromptMode}
                 events={traceEvents}
                 runState={runState}
                 completedAt={completedAt}

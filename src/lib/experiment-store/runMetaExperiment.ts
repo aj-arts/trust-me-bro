@@ -27,7 +27,7 @@ export async function runMetaExperiment(
       workspaceRoot: scenario.workspaceRoot,
       skillsRoot: scenario.skillsRoot,
     });
-  await input.repository.beginRun({
+  const beginState = await input.repository.beginRun({
     runId,
     source: "experiment",
     experimentId: input.experimentId,
@@ -40,10 +40,24 @@ export async function runMetaExperiment(
     model: input.run.runtime?.modelId ?? input.run.runtime?.model.id ?? input.run.model,
     startedAt: input.run.now?.() ?? Date.now(),
   });
-  const result = await runScenario({
-    ...input.run,
-    createRunId: () => runId,
-  });
-  await input.repository.finishRun(result);
-  return result;
+  if (beginState === "completed") {
+    const existing = await input.repository.loadRunDetail(runId);
+    return { status: "completed", artifact: existing.artifact };
+  }
+  try {
+    const result = await runScenario({
+      ...input.run,
+      createRunId: () => runId,
+    });
+    await input.repository.finishRun(result);
+    return result;
+  } catch (error) {
+    await input.repository.abortRun(
+      runId,
+      error instanceof DOMException && error.name === "AbortError"
+        ? "cancelled"
+        : "execution_failed",
+    );
+    throw error;
+  }
 }

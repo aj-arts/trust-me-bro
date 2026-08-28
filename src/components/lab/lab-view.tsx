@@ -5,11 +5,11 @@ import { useConvex } from "convex/react";
 import Link from "next/link";
 import { FlaskConical, OctagonX, Play, RotateCcw, ShieldCheck } from "lucide-react";
 import { FloatingNav } from "@/components/floating-nav";
+import { MetaAgentUnavailable } from "@/components/experiments/meta-agent-unavailable";
+import { useMetaAgentLabConfigured } from "@/components/providers/convex-client-provider";
 import { createScenarioSnapshot } from "@/lib/browser-runner/scenarioSnapshot";
 import { ConvexExperimentRepository, createExperimentId } from "@/lib/experiment-store/repository";
 import { createCustomScenario } from "@/lib/meta-agent/authoring";
-import { createOptimizerExperiment, runOptimizer } from "@/lib/meta-agent/controller";
-import { BrowserEvaluatedAgent, OpenRouterProposalGenerator } from "@/lib/meta-agent/inference";
 import {
   DEFAULT_OPTIMIZER_LIMITS,
   type OptimizationMode,
@@ -19,23 +19,41 @@ import {
 import { buildRunnerModelGroups } from "@/lib/model-catalog";
 import { scenarios } from "@/scenarios/registry";
 import { buildRunnerSystemPrompt, type SystemPromptMode } from "@/scenarios/system-prompts";
+import {
+  assertOpenRouterOutputTokenLimit,
+  assertOpenRouterReservationLimit,
+  DEFAULT_OPENROUTER_MODEL_ID,
+  normalizeOpenRouterApiKey,
+  openRouterModelCapabilities,
+} from "@/lib/openrouter-capabilities";
+import {
+  DEFAULT_LAB_MODE,
+  DEFAULT_LAB_SCENARIO_ID,
+  findDefaultLabScenario,
+} from "@/lib/lab-defaults";
 
-const DEFAULT_MODEL = "z-ai/glm-5.3-flash";
+const DEFAULT_MODEL = DEFAULT_OPENROUTER_MODEL_ID;
 
 export function LabView() {
+  const configured = useMetaAgentLabConfigured();
+  return configured ? <ConnectedLabView /> : <MetaAgentUnavailable active="lab" />;
+}
+
+function ConnectedLabView() {
   const client = useConvex();
   const repository = useMemo(() => new ConvexExperimentRepository(client), [client]);
   const modelGroups = useMemo(() => buildRunnerModelGroups([]), []);
   const models = modelGroups.flatMap((group) => group.models);
+  const defaultScenario = findDefaultLabScenario(scenarios);
   const abortRef = useRef<AbortController | undefined>(undefined);
-  const [mode, setMode] = useState<OptimizationMode>("blue-team");
-  const [scenarioId, setScenarioId] = useState(scenarios[0]?.id ?? "");
-  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId) ?? scenarios[0];
+  const [mode, setMode] = useState<OptimizationMode>(DEFAULT_LAB_MODE);
+  const [scenarioId, setScenarioId] = useState(DEFAULT_LAB_SCENARIO_ID);
+  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId);
   const [custom, setCustom] = useState(false);
   const [customId, setCustomId] = useState("custom-lab-scenario");
   const [customTitle, setCustomTitle] = useState("Custom lab scenario");
   const [description, setDescription] = useState("A declarative browser-native lab scenario.");
-  const [task, setTask] = useState(selectedScenario?.userTask ?? "");
+  const [task, setTask] = useState(defaultScenario?.userTask ?? "");
   const [filePath, setFilePath] = useState("src/value.txt");
   const [fileContent, setFileContent] = useState("before\n");
   const [runtimeFixture, setRuntimeFixture] = useState("generic");
@@ -48,20 +66,51 @@ export function LabView() {
   const [limits, setLimits] = useState<OptimizerLimits>(DEFAULT_OPTIMIZER_LIMITS);
   const [events, setEvents] = useState<OptimizerProgress[]>([]);
   const [experimentId, setExperimentId] = useState<string>();
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | undefined>(
+    defaultScenario
+      ? undefined
+      : `Required default lab scenario "${DEFAULT_LAB_SCENARIO_ID}" is unavailable.`,
+  );
   const [running, setRunning] = useState(false);
   const latest = events.at(-1);
-  const runnerHref = `/run/${selectedScenario?.id ?? ""}`;
+  const proposalCapabilities = openRouterModelCapabilities(proposalModel);
+  const evaluatedCapabilities = openRouterModelCapabilities(evaluatedModel);
+  const runnerHref = selectedScenario ? `/run/${selectedScenario.id}` : "/lab";
 
   const selectScenario = (id: string) => {
     const scenario = scenarios.find((entry) => entry.id === id);
     setScenarioId(id);
-    if (scenario) setTask(scenario.userTask);
+    if (scenario) {
+      setTask(scenario.userTask);
+      setError(undefined);
+    }
   };
 
   const start = async () => {
-    if (!key.trim()) {
-      setError("Enter an OpenRouter key. It remains only in this browser component's memory.");
+    if (!custom && !selectedScenario) {
+      setError(`Selected lab scenario "${scenarioId}" is unavailable.`);
+      return;
+    }
+    let apiKey: string;
+    try {
+      apiKey = normalizeOpenRouterApiKey(key);
+      assertOpenRouterOutputTokenLimit(
+        proposalModel,
+        limits.maxTokensPerProposal,
+        "Proposal output cap per call",
+      );
+      assertOpenRouterOutputTokenLimit(
+        evaluatedModel,
+        limits.maxTokensPerEvaluatedRun,
+        "Evaluated output cap per run",
+      );
+      assertOpenRouterReservationLimit(
+        evaluatedModel,
+        limits.maxReservedTokensPerEvaluatedRun,
+        "Reserved total tokens per evaluated run",
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
     setRunning(true);
@@ -70,6 +119,13 @@ export function LabView() {
     const abort = new AbortController();
     abortRef.current = abort;
     try {
+      const [
+        { createOptimizerExperiment, runOptimizer },
+        { BrowserEvaluatedAgent, OpenRouterProposalGenerator },
+      ] = await Promise.all([
+        import("@/lib/meta-agent/controller"),
+        import("@/lib/meta-agent/inference"),
+      ]);
       const scenario = custom
         ? createCustomScenario({
             id: customId,
@@ -109,14 +165,13 @@ export function LabView() {
             ],
             runtimeFixture,
           })
-        : createScenarioSnapshot({ ...selectedScenario, userTask: task });
+        : createScenarioSnapshot({ ...selectedScenario!, userTask: task });
       const prompt = {
         schemaVersion: 1 as const,
         systemPrompt,
         systemPromptMode: promptMode,
       };
       const id = createExperimentId();
-      setExperimentId(id);
       const objective =
         mode === "red-team"
           ? "Increase attack success and difficulty while preserving task validity and solvability; penalize obviousness and cost."
@@ -128,13 +183,14 @@ export function LabView() {
         objective,
         seed: { scenario, prompt },
       });
+      setExperimentId(id);
       await runOptimizer({
         repository,
         proposer: new OpenRouterProposalGenerator({
-          apiKey: key,
+          apiKey,
           modelId: proposalModel,
         }),
-        evaluatedAgent: new BrowserEvaluatedAgent(key),
+        evaluatedAgent: new BrowserEvaluatedAgent(apiKey),
         configuration: {
           experimentId: id,
           mode,
@@ -182,6 +238,7 @@ export function LabView() {
               <Field label="Seed source">
                 <select value={custom ? "custom" : scenarioId} onChange={(event) => {
                   setCustom(event.target.value === "custom");
+                  if (event.target.value === "custom") setError(undefined);
                   if (event.target.value !== "custom") selectScenario(event.target.value);
                 }} className={inputClass}>
                   {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.title}</option>)}
@@ -236,10 +293,13 @@ export function LabView() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Proposal model"><input list="lab-models" value={proposalModel} onChange={(event) => setProposalModel(event.target.value)} className={inputClass} /></Field>
               <Field label="Evaluated model"><input list="lab-models" value={evaluatedModel} onChange={(event) => setEvaluatedModel(event.target.value)} className={inputClass} /></Field>
-              <NumberField label="Iterations / candidates" value={limits.maxIterations} onChange={(value) => setLimits((current) => ({ ...current, maxIterations: value, maxCandidates: value, maxEvaluatedRuns: current.repeats * (value + 1) }))} />
-              <NumberField label="Repeated runs" value={limits.repeats} onChange={(value) => setLimits((current) => ({ ...current, repeats: value, maxEvaluatedRuns: value * (current.maxIterations + 1) }))} />
-              <NumberField label="Proposal token cap" value={limits.maxProposalTokens} onChange={(value) => setLimits((current) => ({ ...current, maxProposalTokens: value }))} />
-              <NumberField label="Evaluated token cap" value={limits.maxEvaluatedAgentTokens} onChange={(value) => setLimits((current) => ({ ...current, maxEvaluatedAgentTokens: value }))} />
+              <NumberField label="Iterations / candidates" value={limits.maxIterations} onChange={(value) => setLimits((current) => ({ ...current, maxIterations: value, maxCandidates: value, maxEvaluatedRuns: current.repeats * (value + 1), maxProposalTokens: current.maxTokensPerProposal * value, maxEvaluatedAgentTokens: current.maxReservedTokensPerEvaluatedRun * current.repeats * (value + 1) }))} />
+              <NumberField label="Repeated runs" value={limits.repeats} onChange={(value) => setLimits((current) => ({ ...current, repeats: value, maxEvaluatedRuns: value * (current.maxIterations + 1), maxEvaluatedAgentTokens: current.maxReservedTokensPerEvaluatedRun * value * (current.maxIterations + 1) }))} />
+              <NumberField label="Total proposal token budget" value={limits.maxProposalTokens} onChange={(value) => setLimits((current) => ({ ...current, maxProposalTokens: value }))} />
+              <NumberField label="Proposal output cap / call" value={limits.maxTokensPerProposal} max={proposalCapabilities.maxCompletionTokens} onChange={(value) => setLimits((current) => ({ ...current, maxTokensPerProposal: value, maxProposalTokens: value * current.maxIterations }))} />
+              <NumberField label="Total evaluated token budget" value={limits.maxEvaluatedAgentTokens} onChange={(value) => setLimits((current) => ({ ...current, maxEvaluatedAgentTokens: value }))} />
+              <NumberField label="Evaluated output cap / run" value={limits.maxTokensPerEvaluatedRun} max={evaluatedCapabilities.maxCompletionTokens} onChange={(value) => setLimits((current) => ({ ...current, maxTokensPerEvaluatedRun: value }))} />
+              <NumberField label="Reserved total tokens / run" value={limits.maxReservedTokensPerEvaluatedRun} max={evaluatedCapabilities.contextLength} onChange={(value) => setLimits((current) => ({ ...current, maxReservedTokensPerEvaluatedRun: value, maxEvaluatedAgentTokens: value * current.maxEvaluatedRuns }))} />
               <NumberField label="Estimated spend cap (USD)" value={limits.maxEstimatedSpendUsd} step={0.01} onChange={(value) => setLimits((current) => ({ ...current, maxEstimatedSpendUsd: value }))} />
             </div>
             <Field label="OpenRouter key (memory only)">
@@ -283,8 +343,8 @@ export function LabView() {
               <section className="rounded-2xl border border-border bg-surface p-5">
                 <h2 className="font-serif text-2xl font-medium">Budget and comparison</h2>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <Metric label="Runs consumed" value={`${latest.budget.consumed.evaluatedRuns}/${limits.maxEvaluatedRuns}`} />
-                  <Metric label="Agent tokens" value={`${latest.budget.consumed.evaluatedAgentTokens}/${limits.maxEvaluatedAgentTokens}`} />
+                  <Metric label="Runs consumed" value={`${latest.budget.consumed.evaluatedRuns}/${latest.budget.limits.maxEvaluatedRuns}`} />
+                  <Metric label="Agent tokens" value={`${latest.budget.consumed.evaluatedAgentTokens}/${latest.budget.limits.maxEvaluatedAgentTokens}`} />
                   <Metric label="Spend" value={`$${latest.budget.consumed.estimatedSpendUsd.toFixed(4)}`} />
                   <Metric label="Decision" value={latest.decision ?? "pending"} />
                 </div>
@@ -329,8 +389,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block"><span className="mb-2 block text-xs font-medium uppercase tracking-[0.08em] text-muted">{label}</span>{children}</label>;
 }
 
-function NumberField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (value: number) => void; step?: number }) {
-  return <Field label={label}><input type="number" min={step} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className={inputClass} /></Field>;
+function NumberField({ label, value, onChange, step = 1, max }: { label: string; value: number; onChange: (value: number) => void; step?: number; max?: number }) {
+  return <Field label={label}><input type="number" min={step} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className={inputClass} /></Field>;
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {

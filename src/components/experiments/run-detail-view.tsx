@@ -5,8 +5,19 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 import type { JsonValue } from "@/lib/browser-runner/types";
+import { useMetaAgentLabConfigured } from "@/components/providers/convex-client-provider";
+import { MetaAgentUnavailable } from "./meta-agent-unavailable";
 
 export function RunDetailView({ runId }: { runId: string }) {
+  const configured = useMetaAgentLabConfigured();
+  return configured ? (
+    <ConnectedRunDetailView runId={runId} />
+  ) : (
+    <MetaAgentUnavailable active="experiments" />
+  );
+}
+
+function ConnectedRunDetailView({ runId }: { runId: string }) {
   const detail = useQuery(api.runs.loadFullDetail, { runId });
 
   if (detail === undefined) {

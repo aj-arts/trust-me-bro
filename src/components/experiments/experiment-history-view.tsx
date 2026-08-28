@@ -5,9 +5,16 @@ import { ArrowUpRight, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 import { FloatingNav } from "@/components/floating-nav";
+import { MetaAgentUnavailable } from "./meta-agent-unavailable";
+import { useMetaAgentLabConfigured } from "@/components/providers/convex-client-provider";
 import { scenarios } from "@/scenarios/registry";
 
 export function ExperimentHistoryView() {
+  const configured = useMetaAgentLabConfigured();
+  return configured ? <ConnectedExperimentHistoryView /> : <MetaAgentUnavailable active="experiments" />;
+}
+
+function ConnectedExperimentHistoryView() {
   const experiments = useQuery(api.experiments.listHistory, { limit: 100 });
   const runnerHref = `/run/${scenarios[0]?.id ?? ""}`;
 

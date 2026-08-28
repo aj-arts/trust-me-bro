@@ -1,4 +1,9 @@
 import type { Model } from "@earendil-works/pi-ai";
+import {
+  assertOpenRouterOutputTokenLimit,
+  normalizeOpenRouterApiKey,
+  openRouterModelCapabilities,
+} from "../openrouter-capabilities.ts";
 
 export type OpenRouterSessionConfig = {
   apiKey: string;
@@ -13,14 +18,12 @@ export type OpenRouterSession = {
 };
 
 export function createOpenRouterSession(config: OpenRouterSessionConfig): OpenRouterSession {
-  if (!config.apiKey.trim()) {
-    throw new Error("OpenRouter key is required.");
-  }
+  const apiKey = normalizeOpenRouterApiKey(config.apiKey);
 
   return {
     model: createOpenRouterModel(config.model, config.maxTokens),
     modelId: config.model,
-    getApiKey: (provider) => (provider === "openrouter" ? config.apiKey : undefined),
+    getApiKey: (provider) => (provider === "openrouter" ? apiKey : undefined),
   };
 }
 
@@ -28,9 +31,8 @@ export function createOpenRouterModel(id: string, maxTokens = 4096): Model<"open
   if (!id.trim()) {
     throw new Error("OpenRouter model is required.");
   }
-  if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 32_768) {
-    throw new Error("OpenRouter maximum output tokens must be an integer from 1 to 32768.");
-  }
+  assertOpenRouterOutputTokenLimit(id, maxTokens, "OpenRouter maximum output tokens");
+  const capabilities = openRouterModelCapabilities(id);
 
   return {
     id,
@@ -42,7 +44,7 @@ export function createOpenRouterModel(id: string, maxTokens = 4096): Model<"open
     compat: { thinkingFormat: "openrouter" },
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128000,
+    contextWindow: capabilities.contextLength,
     maxTokens,
   };
 }

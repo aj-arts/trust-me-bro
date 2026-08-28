@@ -4,8 +4,19 @@ import { useQuery } from "convex/react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
+import { useMetaAgentLabConfigured } from "@/components/providers/convex-client-provider";
+import { MetaAgentUnavailable } from "./meta-agent-unavailable";
 
 export function ExperimentDetailView({ experimentId }: { experimentId: string }) {
+  const configured = useMetaAgentLabConfigured();
+  return configured ? (
+    <ConnectedExperimentDetailView experimentId={experimentId} />
+  ) : (
+    <MetaAgentUnavailable active="experiments" />
+  );
+}
+
+function ConnectedExperimentDetailView({ experimentId }: { experimentId: string }) {
   const detail = useQuery(api.experiments.getDetail, { experimentId });
 
   return (
@@ -77,7 +88,9 @@ export function ExperimentDetailView({ experimentId }: { experimentId: string })
                 })}
               </Collection>
               <Collection title="Candidates" empty="No candidates recorded.">
-                {detail.candidates.map((candidate) => (
+                {detail.candidates.map((candidate) => {
+                  const validation = candidateValidationIssues(candidate.validationIssuesJson);
+                  return (
                   <article key={candidate.candidateId} className="border-b border-border px-4 py-3 last:border-0">
                     <div className="flex items-center justify-between gap-3">
                       <p className="truncate text-sm font-medium">{candidate.candidateId}</p>
@@ -87,8 +100,18 @@ export function ExperimentDetailView({ experimentId }: { experimentId: string })
                       {candidate.mutationKind} mutation
                       {candidate.parentCandidateId ? ` · parent ${candidate.parentCandidateId}` : ""}
                     </p>
+                    {validation.invalid ? (
+                      <p className="mt-2 text-xs text-danger">Validation details are malformed.</p>
+                    ) : validation.issues.length > 0 ? (
+                      <ul className="mt-2 space-y-1 text-xs text-danger">
+                        {validation.issues.slice(0, 5).map((issue, index) => (
+                          <li key={`${issue.path}-${index}`}>{issue.path}: {issue.message}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </article>
-                ))}
+                  );
+                })}
               </Collection>
             </div>
             {detail.candidatesTruncated || detail.runsTruncated ? (
@@ -102,6 +125,31 @@ export function ExperimentDetailView({ experimentId }: { experimentId: string })
       </div>
     </main>
   );
+}
+
+function candidateValidationIssues(value?: string) {
+  if (!value) return { issues: [], invalid: false };
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every(
+        (issue) =>
+          typeof issue === "object" &&
+          issue !== null &&
+          typeof issue.path === "string" &&
+          typeof issue.message === "string",
+      )
+    ) {
+      return { issues: [], invalid: true };
+    }
+    return {
+      issues: parsed as Array<{ path: string; message: string }>,
+      invalid: false,
+    };
+  } catch {
+    return { issues: [], invalid: true };
+  }
 }
 
 function Revision({ label, value }: { label: string; value: string }) {

@@ -1,11 +1,20 @@
 import type { RunArtifact } from "../browser-runner/types.ts";
-import type { ExperimentRepository, StoredRunSummary } from "../experiment-store/repository.ts";
+import {
+  runArtifactFailed,
+  runArtifactFailureReason,
+} from "../browser-runner/runStatus.ts";
+import { stableStringify } from "../browser-runner/scenarioSnapshot.ts";
+import {
+  OptimizerLeaseConflictError,
+  type ExperimentRepository,
+  type StoredRunSummary,
+} from "../experiment-store/repository.ts";
 import { OptimizerBudget } from "./budget.ts";
 import { parseStructuredProposal } from "./proposal.ts";
 import { aggregateScores, compareAggregates, scoreArtifact } from "./scoring.ts";
 import {
-  DEFAULT_PROPOSAL_LIMITS,
   ProposalValidationError,
+  proposalLimitsForMode,
   type AggregateScore,
   type EvaluatedAgent,
   type OptimizerConfiguration,
@@ -54,7 +63,37 @@ export async function createOptimizerExperiment(input: {
 
 export async function runOptimizer(input: OptimizerControllerInput): Promise<OptimizerProgress> {
   const { repository, configuration } = input;
+  new OptimizerBudget(configuration.limits);
+  const proposalLimits = proposalLimitsForMode(
+    configuration.mode,
+    configuration.proposalLimits,
+  );
   let detail = await repository.loadExperiment(configuration.experimentId);
+  assertCompleteHistory(detail);
+  assertExperimentSeed(detail, input);
+  const configurationJson = stableStringify({ ...configuration, proposalLimits });
+  await repository.bindOptimizerConfiguration(configuration.experimentId, configurationJson);
+  detail = await repository.loadExperiment(configuration.experimentId);
+  assertCompleteHistory(detail);
+  if (detail.experiment.configurationJson !== configurationJson) {
+    throw new Error("Optimizer configuration does not match the persisted experiment.");
+  }
+  let unresolvedProposalAttemptId: string | undefined;
+  if (detail.experiment.proposalReservation) {
+    const reservedCandidate = detail.candidates.find(
+      (candidate) => candidate.candidateId === detail.experiment.proposalReservation?.candidateId,
+    );
+    if (!reservedCandidate) {
+      unresolvedProposalAttemptId = detail.experiment.proposalReservation.attemptId;
+    } else {
+      await repository.completeProposalAttempt(
+        configuration.experimentId,
+        detail.experiment.proposalReservation.attemptId,
+      );
+      detail = await repository.loadExperiment(configuration.experimentId);
+      assertCompleteHistory(detail);
+    }
+  }
   const budget = await reconstructBudget(repository, detail.runs, detail.candidates, configuration);
   const emit = (
     phase: OptimizerProgress["phase"],
@@ -72,11 +111,19 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
     input.onProgress?.(progress);
     return progress;
   };
+  if (unresolvedProposalAttemptId) {
+    return emit(
+      "waiting",
+      detail.candidates.length,
+      `Proposal attempt ${unresolvedProposalAttemptId} may have incurred cost; refusing duplicate inference.`,
+    );
+  }
 
   try {
     if (detail.experiment.status === "draft") {
       await repository.startExperiment(configuration.experimentId);
       detail = await repository.loadExperiment(configuration.experimentId);
+      assertCompleteHistory(detail);
     } else if (detail.experiment.status !== "running") {
       return emit(
         detail.experiment.status === "cancelled" ? "cancelled" : detail.experiment.status === "failed" ? "failed" : "completed",
@@ -109,48 +156,120 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       configuration.limits.maxIterations,
       configuration.limits.maxCandidates,
     );
+    let lastDecision: "accepted" | "rejected" | undefined;
+    let lastProposal: StructuredProposal | undefined;
+    let lastValidationIssues: ProposalValidationError["issues"] | undefined;
     for (let iteration = 0; iteration < iterationLimit; iteration += 1) {
       abortIfRequested(input.signal);
       detail = await repository.loadExperiment(configuration.experimentId);
+      assertCompleteHistory(detail);
       const candidateId = stableCandidateId(configuration.experimentId, iteration);
       const existing = detail.candidates.find((candidate) => candidate.candidateId === candidateId);
+      if (existing?.validationIssuesJson) {
+        const validationIssues = parseValidationIssues(existing.validationIssuesJson);
+        const persistedProposal = existing.proposalJson
+          ? parseStructuredProposal(existing.proposalJson)
+          : undefined;
+        lastProposal =
+          persistedProposal?.budgetUsage
+            ? { ...persistedProposal, budgetUsage: persistedProposal.budgetUsage }
+            : undefined;
+        lastValidationIssues = validationIssues;
+        emit("deciding", iteration + 1, "Candidate rejected by mutation safety validation.", {
+          candidateId,
+          validationIssues,
+          decision: "rejected",
+        });
+        lastDecision = "rejected";
+        continue;
+      }
       let proposal: StructuredProposal;
       let mutated: ReturnType<typeof validateAndApplyProposal>;
       if (existing) {
         if (!existing.proposalJson) throw new Error(`Candidate ${candidateId} has no persisted proposal.`);
-        proposal = parseStructuredProposal(existing.proposalJson);
         mutated = validateAndApplyProposal({
-          proposal,
+          proposal: parseStructuredProposal(existing.proposalJson),
           scenario: seed.scenario,
           prompt: seed.prompt,
           promptRevisionId: seed.promptRevisionId,
-          limits: configuration.proposalLimits,
+          limits: proposalLimits,
         });
+        proposal = mutated.proposal;
+        lastProposal = proposal;
+        lastValidationIssues = undefined;
       } else {
-        budget.assertCanPropose();
+        const candidateRunCount = expectedRunCount(configuration);
+        budget.assertCanProposeAndRun(candidateRunCount);
         emit("proposing", iteration + 1, "Requesting one bounded proposal.");
+        const proposalAttemptId = createAttemptId();
+        await repository.reserveProposalAttempt({
+          experimentId: configuration.experimentId,
+          attemptId: proposalAttemptId,
+          candidateId,
+          modelId: input.proposer.modelId,
+          maxTokens: budget.proposalTokenAllowance(),
+          estimatedCostUsd: configuration.limits.estimatedProposalCostUsd,
+        });
         const response = await input.proposer.generate({
           mode: configuration.mode,
           objective: configuration.objective,
           scenario: seed.scenario,
           prompt: seed.prompt,
           promptRevisionId: seed.promptRevisionId,
-          limits: configuration.proposalLimits ?? DEFAULT_PROPOSAL_LIMITS,
+          limits: proposalLimits,
           maxTokens: budget.proposalTokenAllowance(),
           signal: input.signal,
         });
         budget.consumeProposal(response.outputTokens, response.costUsd);
-        proposal = parseStructuredProposal(response.output);
-        emit("validating", iteration + 1, "Validating proposal lineage and sandbox boundaries.", {
+        const draft = parseStructuredProposal(response.output);
+        try {
+          mutated = validateAndApplyProposal({
+            proposal: draft,
+            scenario: seed.scenario,
+            prompt: seed.prompt,
+            promptRevisionId: seed.promptRevisionId,
+            limits: proposalLimits,
+          });
+        } catch (error) {
+          if (!(error instanceof ProposalValidationError) || !error.proposal) throw error;
+          const parentCandidateId = detail.candidates
+            .filter((candidate) => candidate.status === "accepted")
+            .at(-1)?.candidateId;
+          await repository.createRejectedCandidate({
+            candidateId,
+            experimentId: configuration.experimentId,
+            parentCandidateId,
+            scenarioRevisionId: seed.scenario.revisionId,
+            promptRevisionId: seed.promptRevisionId,
+            mutationKind: configuration.mode === "red-team" ? "scenario" : "prompt",
+            rationale: error.proposal.rationale,
+            generatedBy: input.proposer.modelId,
+            proposalJson: JSON.stringify(error.proposal),
+            proposalTokens: response.outputTokens,
+            proposalCostUsd: response.costUsd,
+            validationIssues: error.issues,
+          });
+          await repository.completeProposalAttempt(
+            configuration.experimentId,
+            proposalAttemptId,
+          );
+          emit("deciding", iteration + 1, "Candidate rejected by mutation safety validation.", {
+            candidateId,
+            proposal: error.proposal,
+            validationIssues: error.issues,
+            decision: "rejected",
+          });
+          lastDecision = "rejected";
+          lastProposal = error.proposal;
+          lastValidationIssues = error.issues;
+          continue;
+        }
+        proposal = mutated.proposal;
+        lastProposal = proposal;
+        lastValidationIssues = undefined;
+        emit("validating", iteration + 1, "Validated proposal and derived canonical mutation metrics.", {
           candidateId,
           proposal,
-        });
-        mutated = validateAndApplyProposal({
-          proposal,
-          scenario: seed.scenario,
-          prompt: seed.prompt,
-          promptRevisionId: seed.promptRevisionId,
-          limits: configuration.proposalLimits,
         });
         const [scenarioRevision, promptRevision] = await Promise.all([
           configuration.mode === "red-team"
@@ -182,9 +301,11 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
           proposalTokens: response.outputTokens,
           proposalCostUsd: response.costUsd,
         });
+        await repository.completeProposalAttempt(configuration.experimentId, proposalAttemptId);
       }
       abortIfRequested(input.signal);
       detail = await repository.loadExperiment(configuration.experimentId);
+      assertCompleteHistory(detail);
       const candidateArtifacts = await ensureRunSet({
         input,
         budget,
@@ -212,7 +333,7 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       const candidate = aggregate(
         candidateArtifacts,
         configuration.mode,
-        subtlety(mutated.editDistance, configuration.proposalLimits?.maxEditDistance ?? DEFAULT_PROPOSAL_LIMITS.maxEditDistance),
+        subtlety(mutated.editDistance, proposalLimits.maxEditDistance),
       );
       emit("evaluating", iteration + 1, "Comparing paired aggregate scores.", {
         candidateId,
@@ -221,6 +342,7 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
         candidate,
       });
       const decision = compareAggregates(candidate, baseline, candidateId) > 0 ? "accepted" : "rejected";
+      lastDecision = decision;
       const persistedCandidate = detail.candidates.find((entry) => entry.candidateId === candidateId);
       if (persistedCandidate?.status === "proposed") {
         await repository.decideCandidate(candidateId, decision);
@@ -248,8 +370,16 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       }
     }
     await repository.completeExperiment(configuration.experimentId);
-    return emit("completed", iterationLimit, "Optimization budget completed.", { baseline });
+    return emit("completed", iterationLimit, "Optimization budget completed.", {
+      baseline,
+      decision: lastDecision,
+      proposal: lastProposal,
+      validationIssues: lastValidationIssues,
+    });
   } catch (error) {
+    if (error instanceof OptimizerLeaseConflictError) {
+      return emit("waiting", detail.candidates.length, error.message);
+    }
     if (isAbort(error) || input.signal?.aborted) {
       await repository.cancelExperiment(configuration.experimentId);
       return emit("cancelled", detail.candidates.length, "Optimization cancelled.");
@@ -303,6 +433,34 @@ async function ensureRunSet(runSet: RunSetInput) {
       : []),
   ];
   const artifacts: RunArtifact[] = [];
+  const expectedRuns = configurations.flatMap((configuration) =>
+    Array.from({ length: runSet.input.configuration.limits.repeats }, (_, repeat) => ({
+      configuration,
+      repeat,
+      runId: stableRunId(
+        runSet.input.configuration.experimentId,
+        runSet.label,
+        runSet.iteration,
+        configuration.suffix,
+        repeat,
+      ),
+    })),
+  );
+  for (const expected of expectedRuns) {
+    const stored = runSet.existingRuns.find((run) => run.runId === expected.runId);
+    if (stored?.status === "failed") throw new Error(`Persisted run ${expected.runId} has failed.`);
+    if (stored?.status === "running") {
+      throw new OptimizerLeaseConflictError(
+        `Persisted run ${expected.runId} is still running; refusing to duplicate a potentially billable attempt.`,
+      );
+    }
+  }
+  runSet.budget.assertCanRun(
+    expectedRuns.filter(
+      ({ runId }) =>
+        runSet.existingRuns.find((run) => run.runId === runId)?.status !== "completed",
+    ).length,
+  );
   for (const configuration of configurations) {
     for (let repeat = 0; repeat < runSet.input.configuration.limits.repeats; repeat += 1) {
       abortIfRequested(runSet.input.signal);
@@ -318,19 +476,12 @@ async function ensureRunSet(runSet: RunSetInput) {
         artifacts.push((await runSet.input.repository.loadRunDetail(runId)).artifact);
         continue;
       }
-      if (stored?.status === "failed") throw new Error(`Persisted run ${runId} has failed.`);
-      if (stored?.status === "running") {
-        throw new Error(
-          `Persisted run ${runId} is still running; refusing to duplicate a potentially billable attempt.`,
-        );
-      }
-      runSet.budget.assertCanRun();
       runSet.emit(
         runSet.label === "baseline" ? "baseline" : "running-candidate",
         runSet.iteration,
         `Running ${configuration.suffix} ${runSet.label} repeat ${repeat + 1}.`,
       );
-      await runSet.input.repository.beginRun({
+      const beginState = await runSet.input.repository.beginRun({
         runId,
         source: "experiment",
         experimentId: runSet.input.configuration.experimentId,
@@ -345,21 +496,74 @@ async function ensureRunSet(runSet: RunSetInput) {
         model: configuration.modelId,
         startedAt: Date.now(),
       });
-      const artifact = await runSet.input.evaluatedAgent.run({
-        runId,
-        scenario: configuration.seed.scenario,
-        prompt: configuration.seed.prompt,
-        modelId: configuration.modelId,
-        maxTokens: runSet.input.configuration.limits.maxTokensPerEvaluatedRun,
-        signal: runSet.input.signal,
-      });
-      await runSet.input.repository.finishRun({ status: runFailed(artifact) ? "failed" : "completed", artifact });
-      if (runFailed(artifact)) throw new Error(`Evaluated run ${runId} failed.`);
-      runSet.budget.consumeRun(totalTokens(artifact), totalCost(artifact));
+      if (beginState === "completed") {
+        const completedArtifact = (await runSet.input.repository.loadRunDetail(runId)).artifact;
+        runSet.budget.consumeRun(totalTokens(completedArtifact), totalCost(completedArtifact));
+        artifacts.push(completedArtifact);
+        continue;
+      }
+      let artifact: RunArtifact;
+      try {
+        artifact = await runSet.input.evaluatedAgent.run({
+          runId,
+          scenario: configuration.seed.scenario,
+          prompt: configuration.seed.prompt,
+          modelId: configuration.modelId,
+          maxTokens: runSet.input.configuration.limits.maxTokensPerEvaluatedRun,
+          signal: runSet.input.signal,
+        });
+        runSet.budget.consumeRun(totalTokens(artifact), totalCost(artifact));
+        await runSet.input.repository.finishRun({
+          status: runArtifactFailed(artifact) ? "failed" : "completed",
+          artifact,
+        });
+      } catch (error) {
+        await runSet.input.repository.abortRun(
+          runId,
+          isAbort(error) ? "cancelled" : "execution_failed",
+        );
+        throw error;
+      }
+      if (runArtifactFailed(artifact)) {
+        throw new Error(`Evaluated run ${runId} failed: ${runArtifactFailureReason(artifact)}`);
+      }
       artifacts.push(artifact);
     }
+
   }
   return artifacts;
+}
+
+function expectedRunCount(configuration: OptimizerConfiguration) {
+  return configuration.limits.repeats * (configuration.holdout ? 2 : 1);
+}
+
+function assertCompleteHistory(
+  detail: Awaited<ReturnType<ExperimentRepository["loadExperiment"]>>,
+) {
+  if (detail.candidatesTruncated || detail.runsTruncated) {
+    throw new Error("Experiment history is truncated; refusing incomplete budget reconstruction.");
+  }
+}
+
+function assertExperimentSeed(
+  detail: Awaited<ReturnType<ExperimentRepository["loadExperiment"]>>,
+  input: OptimizerControllerInput,
+) {
+  if (
+    detail.experiment.objective !== input.configuration.objective ||
+    detail.experiment.scenarioRevisionId !== input.seed.scenario.revisionId ||
+    detail.experiment.promptRevisionId !== input.seed.promptRevisionId
+  ) {
+    throw new Error("Optimizer seed or objective does not match the persisted experiment.");
+  }
+}
+
+function createAttemptId() {
+  if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
+    throw new Error("Secure proposal attempt identifiers are unavailable.");
+  }
+  return `proposal-${crypto.randomUUID()}`;
 }
 
 async function reconstructBudget(
@@ -379,12 +583,12 @@ async function reconstructBudget(
     candidates: candidates.length,
     evaluatedRuns: artifacts.length + reservedRuns,
     proposalTokens: candidates.reduce(
-      (sum, candidate) => sum + (candidate.proposalTokens ?? configuration.limits.maxProposalTokens),
+      (sum, candidate) => sum + (candidate.proposalTokens ?? configuration.limits.maxTokensPerProposal),
       0,
     ),
     evaluatedAgentTokens:
       artifacts.reduce((sum, artifact) => sum + totalTokens(artifact), 0) +
-      reservedRuns * configuration.limits.maxTokensPerEvaluatedRun,
+      reservedRuns * configuration.limits.maxReservedTokensPerEvaluatedRun,
     estimatedSpendUsd:
       candidates.reduce(
         (sum, candidate) =>
@@ -433,10 +637,6 @@ function subtlety(editDistance: number, maximum: number) {
   return Math.max(0, 1 - editDistance / Math.max(1, maximum));
 }
 
-function runFailed(artifact: RunArtifact) {
-  return artifact.errors.some((error) => ["setup", "provider", "runner"].includes(error.phase));
-}
-
 function abortIfRequested(signal: AbortSignal | undefined) {
   if (signal?.aborted) throw new DOMException("Optimizer cancelled.", "AbortError");
 }
@@ -449,5 +649,24 @@ function formatError(error: unknown) {
   if (error instanceof ProposalValidationError) {
     return error.issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n").slice(0, 4000);
   }
+
   return (error instanceof Error ? error.message : String(error)).slice(0, 4000);
+}
+
+function parseValidationIssues(value: string) {
+  const parsed: unknown = JSON.parse(value);
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (issue) =>
+        typeof issue === "object" &&
+        issue !== null &&
+        typeof issue.path === "string" &&
+        typeof issue.code === "string" &&
+        typeof issue.message === "string",
+    )
+  ) {
+    throw new Error("Persisted candidate validation issues are invalid.");
+  }
+  return parsed as ProposalValidationError["issues"];
 }

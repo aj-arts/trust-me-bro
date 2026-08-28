@@ -1,10 +1,12 @@
 import { byteLength, type PromptSnapshot } from "../experiment-store/core.ts";
 import { createScenarioSnapshot, type ScenarioSnapshot } from "../browser-runner/scenarioSnapshot.ts";
 import type { Scenario } from "../../scenarios/types.ts";
+import { DEFAULT_WORKSPACE_ROOT } from "../../scenarios/virtual-files.ts";
 import {
   DEFAULT_PROPOSAL_LIMITS,
   ProposalValidationError,
   type ProposalLimits,
+  type ProposalDraft,
   type ProposalValidationIssue,
   type StructuredProposal,
 } from "./types.ts";
@@ -32,6 +34,7 @@ export const ALLOWED_RUNTIME_FIXTURES = new Set([
 ]);
 
 export type ValidatedMutation = {
+  proposal: StructuredProposal;
   scenario: ScenarioSnapshot;
   prompt: PromptSnapshot;
   editDistance: number;
@@ -40,7 +43,7 @@ export type ValidatedMutation = {
 };
 
 export function validateAndApplyProposal(input: {
-  proposal: StructuredProposal;
+  proposal: ProposalDraft;
   scenario: ScenarioSnapshot;
   prompt: PromptSnapshot;
   promptRevisionId: string;
@@ -71,6 +74,7 @@ export function validateAndApplyProposal(input: {
   const touchedFiles = new Set<string>();
   let editDistance = 0;
   let bytesAdded = 0;
+  const normalizedOperations = proposal.operations.map((operation) => ({ ...operation }));
   for (const [index, operation] of proposal.operations.entries()) {
     const operationPath = `$.operations[${index}]`;
     if (operation.op === "set") {
@@ -108,8 +112,10 @@ export function validateAndApplyProposal(input: {
     }
     const encodedPath = operation.path.slice("/files/".length);
     let filePath: string;
+    let workspaceRoot: string;
     try {
-      filePath = normalizeVirtualPath(decodeJsonPointer(encodedPath));
+      workspaceRoot = validateWorkspaceRoot(scenario.workspaceRoot ?? DEFAULT_WORKSPACE_ROOT);
+      filePath = canonicalizeOperationFilePath(encodedPath, workspaceRoot);
     } catch (error) {
       add(
         issues,
@@ -120,12 +126,30 @@ export function validateAndApplyProposal(input: {
       continue;
     }
     touchedFiles.add(filePath);
-    const previous = nextScenario.files[filePath] ?? "";
+    const absoluteAlias = `${workspaceRoot}/${filePath}`;
+    const hasRelative = Object.hasOwn(nextScenario.files, filePath);
+    const hasAbsolute = Object.hasOwn(nextScenario.files, absoluteAlias);
+    if (hasRelative && hasAbsolute) {
+      add(
+        issues,
+        `${operationPath}.path`,
+        "invalid_path",
+        "Scenario contains ambiguous relative and workspace-absolute aliases.",
+      );
+      continue;
+    }
+    normalizedOperations[index] = { ...operation, path: `/files/${filePath}` };
+    const previous = hasRelative
+      ? nextScenario.files[filePath]
+      : hasAbsolute
+        ? nextScenario.files[absoluteAlias]
+        : "";
     const next = operation.op === "delete" ? "" : operation.value;
     editDistance += estimateEditDistance(previous, next);
     bytesAdded += Math.max(0, byteLength(next) - byteLength(previous));
-    if (operation.op === "delete") delete nextScenario.files[filePath];
-    else nextScenario.files[filePath] = operation.value;
+    delete nextScenario.files[filePath];
+    delete nextScenario.files[absoluteAlias];
+    if (operation.op !== "delete") nextScenario.files[filePath] = operation.value;
   }
   if (totalValueBytes > limits.maxTotalValueBytes) {
     add(issues, "$.operations", "limit_exceeded", "Combined operation values exceed their byte limit.");
@@ -133,7 +157,7 @@ export function validateAndApplyProposal(input: {
   if (touchedFiles.size > limits.maxFilesTouched) {
     add(issues, "$.operations", "limit_exceeded", `At most ${limits.maxFilesTouched} files may be touched.`);
   }
-  validateScenarioBoundary(nextScenario, limits, issues);
+  validateScenarioBoundary(scenario, nextScenario, limits, issues);
   if (byteLength(nextPrompt) > limits.maxPromptBytes) {
     add(issues, "$.operations", "limit_exceeded", "Mutated prompt exceeds its byte limit.");
   }
@@ -155,20 +179,15 @@ export function validateAndApplyProposal(input: {
     bytesAdded,
     estimatedEditDistance: editDistance,
   };
-  for (const key of Object.keys(actualBudget) as Array<keyof typeof actualBudget>) {
-    if (proposal.budgetUsage[key] !== actualBudget[key]) {
-      add(
-        issues,
-        `$.budgetUsage.${key}`,
-        "budget_mismatch",
-        `Declared ${proposal.budgetUsage[key]} but validation computed ${actualBudget[key]}.`,
-      );
-    }
-  }
   if (issues.length > 0) {
-    throw new ProposalValidationError("Proposal violates optimizer safety constraints.", issues);
+    throw new ProposalValidationError(
+      "Proposal violates optimizer safety constraints.",
+      issues,
+      { ...proposal, operations: normalizedOperations, budgetUsage: actualBudget },
+    );
   }
   return {
+    proposal: { ...proposal, operations: normalizedOperations, budgetUsage: actualBudget },
     scenario: createScenarioSnapshot(nextScenario),
     prompt: { ...prompt, systemPrompt: nextPrompt },
     editDistance,
@@ -181,6 +200,7 @@ export function normalizeVirtualPath(value: string) {
   if (!value || value.includes("\0") || value.includes("\\") || value.startsWith("/")) {
     throw new Error("Virtual paths must be non-empty relative POSIX paths.");
   }
+
   const segments = value.split("/");
   if (segments.some((segment) => !segment || segment === "." || segment === ".." || segment === "~")) {
     throw new Error("Virtual paths cannot contain empty, dot, parent, or home segments.");
@@ -192,7 +212,48 @@ export function normalizeVirtualPath(value: string) {
   return normalized;
 }
 
+function canonicalizeOperationFilePath(value: string, workspaceRoot: string) {
+  const decoded = decodeJsonPointer(value);
+  if (decoded === workspaceRoot || decoded === `${workspaceRoot}/`) {
+    throw new Error("File operation path must target a file below the workspace root.");
+  }
+  if (decoded.startsWith("/")) {
+    if (!decoded.startsWith(`${workspaceRoot}/`)) {
+      throw new Error("Absolute file operation path is outside the scenario workspace.");
+    }
+    return normalizeVirtualPath(decoded.slice(workspaceRoot.length + 1));
+  }
+  return normalizeVirtualPath(decoded);
+}
+
+function validateWorkspaceRoot(value: string) {
+  if (
+    value === "/" ||
+    !value.startsWith("/") ||
+    value.endsWith("/") ||
+    value.includes("\\") ||
+    value.includes("%") ||
+    /[^\x21-\x7e]/.test(value)
+  ) {
+    throw new Error("Scenario workspace root is not a canonical absolute POSIX path.");
+  }
+  const segments = value.slice(1).split("/");
+  if (
+    segments.some(
+      (segment) =>
+        !segment ||
+        segment === "." ||
+        segment === ".." ||
+        !/^[A-Za-z0-9._@+,:=-]+$/.test(segment),
+    )
+  ) {
+    throw new Error("Scenario workspace root contains invalid path segments.");
+  }
+  return value;
+}
+
 function validateScenarioBoundary(
+  original: ScenarioSnapshot,
   scenario: Scenario,
   limits: ProposalLimits,
   issues: ProposalValidationIssue[],
@@ -208,6 +269,12 @@ function validateScenarioBoundary(
     add(issues, "$.operations", "limit_exceeded", "Scenario files exceed the total byte limit.");
   }
   for (const path of Object.keys(scenario.files)) {
+    if (
+      Object.hasOwn(original.files, path) &&
+      original.files[path] === scenario.files[path]
+    ) {
+      continue;
+    }
     try {
       normalizeVirtualPath(path);
     } catch (error) {
@@ -246,8 +313,8 @@ function snapshotToScenario(snapshot: ScenarioSnapshot): Scenario {
 }
 
 function isPromptOperation(
-  operation: StructuredProposal["operations"][number],
-): operation is Extract<StructuredProposal["operations"][number], { path: "/systemPrompt" }> {
+  operation: ProposalDraft["operations"][number],
+): operation is Extract<ProposalDraft["operations"][number], { path: "/systemPrompt" }> {
   return operation.op === "set" && operation.path === "/systemPrompt";
 }
 
