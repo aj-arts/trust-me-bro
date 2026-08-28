@@ -233,7 +233,7 @@ export const DEFAULT_OPTIMIZER_LIMITS: OptimizerLimits = {
   maxEvaluatedAgentTokens: 2_097_152,
   maxTokensPerEvaluatedRun: 131_072,
   maxReservedTokensPerEvaluatedRun: 1_048_576,
-  maxEstimatedSpendUsd: 0.1,
+  maxEstimatedSpendUsd: 25,
   estimatedProposalCostUsd: 0.02,
   estimatedEvaluatedRunCostUsd: 0.04,
 };

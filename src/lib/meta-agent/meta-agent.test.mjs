@@ -560,6 +560,7 @@ test("budget enforcement stops before reserved work crosses a limit", () => {
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxTokensPerEvaluatedRun, 131_072);
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxReservedTokensPerEvaluatedRun, 1_048_576);
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEvaluatedAgentTokens, 2_097_152);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEstimatedSpendUsd, 25);
   assert.deepEqual(openRouterModelCapabilities("z-ai/glm-5.3-flash"), {
     contextLength: 1_048_576,
     maxCompletionTokens: 131_072,

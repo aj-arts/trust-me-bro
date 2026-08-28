@@ -54,7 +54,7 @@ model ID. The default hard budget remains sparse—one baseline, one candidate, 
 and sequential execution—but its token ceilings use GLM-5.3-Flash's published maxima:
 131,072 proposal output tokens per call, 131,072 evaluated output tokens per run,
 1,048,576 reserved total tokens per evaluated run, and a 2,097,152 aggregate evaluated
-token budget for the two default runs. The $0.10 estimated-spend ceiling remains
+token budget for the two default runs. The $25 estimated-spend ceiling remains
 independent and enforced.
 Proposal requests use OpenRouter's normalized `reasoning: { effort: "low" }` parameter so
 mandatory-reasoning models retain reasoning without starving the bounded JSON response.
