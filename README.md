@@ -56,6 +56,12 @@ and a $0.10 estimated-spend ceiling. The proposal allowance leaves room for
 reasoning-capable models to return the required strict JSON object. Increase these values
 only when intentionally opting into more iterations or repeated runs.
 
+Proposal schema version 1 accepts legacy model-supplied `budgetUsage` for compatibility,
+but does not trust it. The validator derives canonical operation count, unique files
+touched, bytes added, and edit distance from the parsed operations and current revisions;
+persisted proposals always contain those computed values. New model prompts omit
+`budgetUsage` entirely.
+
 ## Optimizer modes and objective
 
 The lab keeps the two mutation surfaces separate:

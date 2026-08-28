@@ -158,14 +158,14 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       let mutated: ReturnType<typeof validateAndApplyProposal>;
       if (existing) {
         if (!existing.proposalJson) throw new Error(`Candidate ${candidateId} has no persisted proposal.`);
-        proposal = parseStructuredProposal(existing.proposalJson);
         mutated = validateAndApplyProposal({
-          proposal,
+          proposal: parseStructuredProposal(existing.proposalJson),
           scenario: seed.scenario,
           prompt: seed.prompt,
           promptRevisionId: seed.promptRevisionId,
           limits: configuration.proposalLimits,
         });
+        proposal = mutated.proposal;
       } else {
         const candidateRunCount = expectedRunCount(configuration);
         budget.assertCanProposeAndRun(candidateRunCount);
@@ -190,17 +190,17 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
           signal: input.signal,
         });
         budget.consumeProposal(response.outputTokens, response.costUsd);
-        proposal = parseStructuredProposal(response.output);
-        emit("validating", iteration + 1, "Validating proposal lineage and sandbox boundaries.", {
-          candidateId,
-          proposal,
-        });
         mutated = validateAndApplyProposal({
-          proposal,
+          proposal: parseStructuredProposal(response.output),
           scenario: seed.scenario,
           prompt: seed.prompt,
           promptRevisionId: seed.promptRevisionId,
           limits: configuration.proposalLimits,
+        });
+        proposal = mutated.proposal;
+        emit("validating", iteration + 1, "Validated proposal and derived canonical mutation metrics.", {
+          candidateId,
+          proposal,
         });
         const [scenarioRevision, promptRevision] = await Promise.all([
           configuration.mode === "red-team"

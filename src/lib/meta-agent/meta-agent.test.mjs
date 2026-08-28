@@ -184,6 +184,73 @@ test("red and blue proposals mutate only their allowed surface and preserve dete
   assert.deepEqual(blue.scenario, scenario);
 });
 
+test("proposal budgets are optional input and always derived from validated operations", () => {
+  const scenario = seedScenario();
+  const withoutBudget = proposal();
+  delete withoutBudget.budgetUsage;
+  const omitted = validateAndApplyProposal({
+    proposal: parseStructuredProposal(JSON.stringify(withoutBudget)),
+    scenario,
+    prompt,
+    promptRevisionId: "prompt-parent",
+  });
+  assert.deepEqual(omitted.proposal.budgetUsage, {
+    operations: 1,
+    filesTouched: 1,
+    bytesAdded: 0,
+    estimatedEditDistance: 6,
+  });
+
+  const bogus = validateAndApplyProposal({
+    proposal: parseStructuredProposal(
+      JSON.stringify({
+        ...proposal(),
+        budgetUsage: {
+          operations: 0,
+          filesTouched: 0,
+          bytesAdded: 0,
+          estimatedEditDistance: 0,
+        },
+      }),
+    ),
+    scenario,
+    prompt,
+    promptRevisionId: "prompt-parent",
+  });
+  assert.deepEqual(bogus.proposal.budgetUsage, omitted.proposal.budgetUsage);
+
+  assert.throws(
+    () =>
+      validateAndApplyProposal({
+        proposal: parseStructuredProposal(
+          JSON.stringify({
+            ...proposal(),
+            operations: [
+              { op: "set", path: "/files/src~1value.txt", value: "substantially different" },
+            ],
+            budgetUsage: {
+              operations: 0,
+              filesTouched: 0,
+              bytesAdded: 0,
+              estimatedEditDistance: 0,
+            },
+          }),
+        ),
+        scenario,
+        prompt,
+        promptRevisionId: "prompt-parent",
+        limits: {
+          ...DEFAULT_PROPOSAL_LIMITS,
+          maxEditDistance: 1,
+          maxEditRatio: 1,
+        },
+      }),
+    (error) =>
+      error instanceof ProposalValidationError &&
+      error.issues.some((issue) => issue.code === "limit_exceeded"),
+  );
+});
+
 test("custom scenario authoring is declarative and rejects shell syntax", () => {
   const base = {
     id: "custom-case",
@@ -251,16 +318,23 @@ test("proposal generator binds only the default host fetch", async () => {
   }
 
   let injectedCalledWithoutReceiver = false;
+  let proposalInstructions = "";
   const injectedGenerator = new OpenRouterProposalGenerator({
     apiKey: "test-only-key",
     modelId: "fake/proposer",
-    fetchImpl: function () {
+    fetchImpl: function (_url, init) {
       injectedCalledWithoutReceiver = this === undefined;
+      const body = JSON.parse(init.body);
+      proposalInstructions = body.messages[0].content;
       return Promise.resolve(response);
     },
   });
   await injectedGenerator.generate(request);
   assert.equal(injectedCalledWithoutReceiver, true);
+  assert.ok(proposalInstructions.includes("Do not include budgetUsage"));
+  assert.ok(!proposalInstructions.includes("must exactly report"));
+  assert.ok(!proposalInstructions.includes("UTF-8 bytesAdded"));
+  assert.ok(!proposalInstructions.includes("estimatedEditDistance"));
 
   const truncatedGenerator = new OpenRouterProposalGenerator({
     apiKey: "test-only-key",
@@ -343,6 +417,12 @@ test("full fake-model iteration persists and accepts a red-team candidate", asyn
   const detail = await repository.loadExperiment(experimentId);
   assert.equal(detail.experiment.status, "completed");
   assert.equal(detail.candidates[0].status, "accepted");
+  assert.deepEqual(JSON.parse(detail.candidates[0].proposalJson).budgetUsage, {
+    operations: 1,
+    filesTouched: 1,
+    bytesAdded: 0,
+    estimatedEditDistance: 6,
+  });
   assert.equal(detail.runs.length, 2);
 });
 

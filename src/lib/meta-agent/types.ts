@@ -80,6 +80,10 @@ export type StructuredProposal = {
   budgetUsage: MutationBudgetUsage;
 };
 
+export type ProposalDraft = Omit<StructuredProposal, "budgetUsage"> & {
+  budgetUsage?: MutationBudgetUsage;
+};
+
 export type ProposalValidationIssue = {
   path: string;
   code:

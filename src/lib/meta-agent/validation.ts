@@ -5,6 +5,7 @@ import {
   DEFAULT_PROPOSAL_LIMITS,
   ProposalValidationError,
   type ProposalLimits,
+  type ProposalDraft,
   type ProposalValidationIssue,
   type StructuredProposal,
 } from "./types.ts";
@@ -32,6 +33,7 @@ export const ALLOWED_RUNTIME_FIXTURES = new Set([
 ]);
 
 export type ValidatedMutation = {
+  proposal: StructuredProposal;
   scenario: ScenarioSnapshot;
   prompt: PromptSnapshot;
   editDistance: number;
@@ -40,7 +42,7 @@ export type ValidatedMutation = {
 };
 
 export function validateAndApplyProposal(input: {
-  proposal: StructuredProposal;
+  proposal: ProposalDraft;
   scenario: ScenarioSnapshot;
   prompt: PromptSnapshot;
   promptRevisionId: string;
@@ -155,20 +157,11 @@ export function validateAndApplyProposal(input: {
     bytesAdded,
     estimatedEditDistance: editDistance,
   };
-  for (const key of Object.keys(actualBudget) as Array<keyof typeof actualBudget>) {
-    if (proposal.budgetUsage[key] !== actualBudget[key]) {
-      add(
-        issues,
-        `$.budgetUsage.${key}`,
-        "budget_mismatch",
-        `Declared ${proposal.budgetUsage[key]} but validation computed ${actualBudget[key]}.`,
-      );
-    }
-  }
   if (issues.length > 0) {
     throw new ProposalValidationError("Proposal violates optimizer safety constraints.", issues);
   }
   return {
+    proposal: { ...proposal, budgetUsage: actualBudget },
     scenario: createScenarioSnapshot(nextScenario),
     prompt: { ...prompt, systemPrompt: nextPrompt },
     editDistance,
@@ -246,8 +239,8 @@ function snapshotToScenario(snapshot: ScenarioSnapshot): Scenario {
 }
 
 function isPromptOperation(
-  operation: StructuredProposal["operations"][number],
-): operation is Extract<StructuredProposal["operations"][number], { path: "/systemPrompt" }> {
+  operation: ProposalDraft["operations"][number],
+): operation is Extract<ProposalDraft["operations"][number], { path: "/systemPrompt" }> {
   return operation.op === "set" && operation.path === "/systemPrompt";
 }
 
