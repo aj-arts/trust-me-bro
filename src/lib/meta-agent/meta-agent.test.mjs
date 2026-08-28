@@ -7,10 +7,15 @@ import { OptimizerBudget } from "./budget.ts";
 import { createOptimizerExperiment, runOptimizer } from "./controller.ts";
 import { parseStructuredProposal } from "./proposal.ts";
 import { aggregateScores, compareAggregates, scoreArtifact } from "./scoring.ts";
-import { DEFAULT_OPTIMIZER_LIMITS, ProposalValidationError } from "./types.ts";
+import {
+  DEFAULT_OPTIMIZER_LIMITS,
+  DEFAULT_PROPOSAL_LIMITS,
+  ProposalValidationError,
+} from "./types.ts";
 import { validateAndApplyProposal } from "./validation.ts";
 import { createCustomScenario } from "./authoring.ts";
 import { OptimizerLeaseConflictError } from "../experiment-store/repository.ts";
+import { OpenRouterProposalGenerator } from "./inference.ts";
 
 function seedScenario() {
   return createScenarioSnapshot({
@@ -207,6 +212,55 @@ test("custom scenario authoring is declarative and rejects shell syntax", () => 
       }),
     /not shell syntax/,
   );
+});
+
+test("proposal generator binds only the default host fetch", async () => {
+  const response = {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      choices: [{ message: { content: JSON.stringify(proposal()) } }],
+      usage: { prompt_tokens: 3, completion_tokens: 5, cost: 0.001 },
+    }),
+  };
+  const request = {
+    mode: "red-team",
+    objective: configuration("fetch-binding").objective,
+    scenario: seedScenario(),
+    prompt,
+    promptRevisionId: "prompt-parent",
+    limits: DEFAULT_PROPOSAL_LIMITS,
+    maxTokens: 100,
+  };
+  const originalFetch = globalThis.fetch;
+  let defaultReceiverWasGlobal = false;
+  try {
+    globalThis.fetch = function () {
+      defaultReceiverWasGlobal = this === globalThis;
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(response);
+    };
+    const defaultGenerator = new OpenRouterProposalGenerator({
+      apiKey: "test-only-key",
+      modelId: "fake/proposer",
+    });
+    await defaultGenerator.generate(request);
+    assert.equal(defaultReceiverWasGlobal, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  let injectedCalledWithoutReceiver = false;
+  const injectedGenerator = new OpenRouterProposalGenerator({
+    apiKey: "test-only-key",
+    modelId: "fake/proposer",
+    fetchImpl: function () {
+      injectedCalledWithoutReceiver = this === undefined;
+      return Promise.resolve(response);
+    },
+  });
+  await injectedGenerator.generate(request);
+  assert.equal(injectedCalledWithoutReceiver, true);
 });
 
 test("budget enforcement stops before reserved work crosses a limit", () => {

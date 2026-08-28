@@ -19,11 +19,12 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
     if (!input.modelId.trim()) throw new Error("A proposal model ID is required.");
     this.apiKey = input.apiKey;
     this.modelId = input.modelId;
-    this.fetchImpl = input.fetchImpl ?? fetch;
+    this.fetchImpl = input.fetchImpl ?? globalThis.fetch.bind(globalThis);
   }
 
   async generate(request: ProposalRequest): Promise<ProposalResponse> {
-    const response = await this.fetchImpl(OPENROUTER_ENDPOINT, {
+    const fetchImpl = this.fetchImpl;
+    const response = await fetchImpl(OPENROUTER_ENDPOINT, {
       method: "POST",
       signal: request.signal,
       headers: {
