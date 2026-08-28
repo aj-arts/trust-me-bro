@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useDeckTheme } from "@/components/theme-provider";
 
 type FloatingNavProps = {
-  active: "dashboard" | "runner" | "experiments" | "vision";
+  active: "dashboard" | "runner" | "experiments" | "lab" | "vision";
   runnerHref: string;
   dashboardHref?: string;
   experimentsHref?: string;
+  labHref?: string;
   visionHref?: string;
   variant?: "floating" | "rail" | "inline";
   className?: string;
@@ -19,6 +20,7 @@ export function FloatingNav({
   runnerHref,
   dashboardHref = "/",
   experimentsHref = "/experiments",
+  labHref = "/lab",
   visionHref = "/vision",
   variant = "floating",
   className,
@@ -57,6 +59,7 @@ export function FloatingNav({
           dashboardHref={dashboardHref}
           runnerHref={runnerHref}
           experimentsHref={experimentsHref}
+          labHref={labHref}
           visionHref={visionHref}
           itemClass={itemClass}
         />
@@ -79,6 +82,7 @@ export function FloatingNav({
               dashboardHref={dashboardHref}
               runnerHref={runnerHref}
               experimentsHref={experimentsHref}
+              labHref={labHref}
               visionHref={visionHref}
               itemClass={itemClass}
             />
@@ -101,6 +105,7 @@ export function FloatingNav({
           dashboardHref={dashboardHref}
           runnerHref={runnerHref}
           experimentsHref={experimentsHref}
+          labHref={labHref}
           visionHref={visionHref}
           itemClass={itemClass}
         />
@@ -115,10 +120,11 @@ export function FloatingNav({
 }
 
 type NavLinksProps = {
-  active: "dashboard" | "runner" | "experiments" | "vision";
+  active: "dashboard" | "runner" | "experiments" | "lab" | "vision";
   dashboardHref: string;
   runnerHref: string;
   experimentsHref: string;
+  labHref: string;
   visionHref: string;
   itemClass: (isActive: boolean) => string;
 };
@@ -128,6 +134,7 @@ function NavLinks({
   dashboardHref,
   runnerHref,
   experimentsHref,
+  labHref,
   visionHref,
   itemClass,
 }: NavLinksProps) {
@@ -153,6 +160,13 @@ function NavLinks({
         className={itemClass(active === "experiments")}
       >
         Experiments
+      </Link>
+      <Link
+        href={labHref}
+        aria-current={active === "lab" ? "page" : undefined}
+        className={itemClass(active === "lab")}
+      >
+        Lab
       </Link>
       <Link
         href={visionHref}

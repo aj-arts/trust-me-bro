@@ -42,6 +42,8 @@ export type CandidateRecord = {
   rationale?: string;
   generatedBy?: string;
   proposalJson?: string;
+  proposalTokens?: number;
+  proposalCostUsd?: number;
   createdAt: number;
   decidedAt?: number;
 };
@@ -140,6 +142,7 @@ export interface ExperimentRepository {
   startExperiment(experimentId: string): Promise<void>;
   completeExperiment(experimentId: string): Promise<void>;
   failExperiment(experimentId: string, failureMessage: string): Promise<void>;
+  cancelExperiment(experimentId: string): Promise<void>;
   createCandidate(input: {
     candidateId: string;
     experimentId: string;
@@ -150,6 +153,8 @@ export interface ExperimentRepository {
     rationale?: string;
     generatedBy?: string;
     proposalJson?: string;
+    proposalTokens?: number;
+    proposalCostUsd?: number;
   }): Promise<void>;
   decideCandidate(candidateId: string, decision: "accepted" | "rejected"): Promise<void>;
   listExperimentHistory(limit?: number): Promise<ExperimentRecord[]>;
@@ -213,6 +218,10 @@ export class ConvexExperimentRepository implements ExperimentRepository {
   async failExperiment(experimentId: string, failureMessage: string) {
     assertNoPersistedSecrets(failureMessage);
     await this.client.mutation(api.experiments.fail, { experimentId, failureMessage });
+  }
+
+  async cancelExperiment(experimentId: string) {
+    await this.client.mutation(api.experiments.cancel, { experimentId });
   }
 
   async createCandidate(input: Parameters<ExperimentRepository["createCandidate"]>[0]) {

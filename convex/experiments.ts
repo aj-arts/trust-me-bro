@@ -34,7 +34,17 @@ export const create = mutation({
       .query("experiments")
       .withIndex("by_experiment_id", (q) => q.eq("experimentId", args.experimentId))
       .unique();
-    if (existing) throw new ConvexError(`Experiment ${args.experimentId} already exists.`);
+    if (existing) {
+      if (
+        existing.name === args.name &&
+        existing.objective === args.objective &&
+        existing.scenarioRevisionId === args.scenarioRevisionId &&
+        existing.promptRevisionId === args.promptRevisionId
+      ) {
+        return existing._id;
+      }
+      throw new ConvexError(`Experiment ${args.experimentId} already exists with different metadata.`);
+    }
     await Promise.all([
       requireScenarioRevision(ctx.db, args.scenarioRevisionId),
       requirePromptRevision(ctx.db, args.promptRevisionId),
@@ -90,18 +100,44 @@ export const createCandidate = mutation({
     rationale: v.optional(v.string()),
     generatedBy: v.optional(v.string()),
     proposalJson: v.optional(v.string()),
+    proposalTokens: v.optional(v.number()),
+    proposalCostUsd: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     if (!args.candidateId.trim()) throw new ConvexError("Candidate ID is required.");
     if ((args.rationale?.length ?? 0) > 8000 || (args.proposalJson?.length ?? 0) > 64 * 1024) {
       throw new ConvexError("Candidate metadata exceeds its limit.");
     }
+    if (
+      (args.proposalTokens !== undefined &&
+        (!Number.isInteger(args.proposalTokens) || args.proposalTokens < 0)) ||
+      (args.proposalCostUsd !== undefined &&
+        (!Number.isFinite(args.proposalCostUsd) || args.proposalCostUsd < 0))
+    ) {
+      throw new ConvexError("Candidate proposal usage is invalid.");
+    }
     rejectSecrets(args.rationale, args.generatedBy, args.proposalJson);
     const existing = await ctx.db
       .query("candidates")
       .withIndex("by_candidate_id", (q) => q.eq("candidateId", args.candidateId))
       .unique();
-    if (existing) throw new ConvexError(`Candidate ${args.candidateId} already exists.`);
+    if (existing) {
+      if (
+        existing.experimentId === args.experimentId &&
+        existing.parentCandidateId === args.parentCandidateId &&
+        existing.scenarioRevisionId === args.scenarioRevisionId &&
+        existing.promptRevisionId === args.promptRevisionId &&
+        existing.mutationKind === args.mutationKind &&
+        existing.rationale === args.rationale &&
+        existing.generatedBy === args.generatedBy &&
+        existing.proposalJson === args.proposalJson
+        && existing.proposalTokens === args.proposalTokens
+        && existing.proposalCostUsd === args.proposalCostUsd
+      ) {
+        return existing._id;
+      }
+      throw new ConvexError(`Candidate ${args.candidateId} already exists with different metadata.`);
+    }
     const experiment = await requireExperiment(ctx.db, args.experimentId);
     if (experiment.status !== "running") {
       throw new ConvexError("Candidates can only be created for a running experiment.");
@@ -153,6 +189,7 @@ export const decideCandidate = mutation({
   },
   handler: async (ctx, args) => {
     const candidate = await requireCandidate(ctx.db, args.candidateId);
+    if (candidate.status === args.decision) return candidate._id;
     assertCandidateChange(candidate.status, args.decision);
     await ctx.db.patch(candidate._id, {
       status: args.decision,
@@ -221,6 +258,7 @@ async function transitionExperiment(
   failureMessage?: string,
 ) {
   const experiment = await requireExperiment(ctx.db, experimentId);
+  if (experiment.status === nextStatus) return experiment._id;
   try {
     assertExperimentTransition(experiment.status, nextStatus);
   } catch (error) {
