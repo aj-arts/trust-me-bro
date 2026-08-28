@@ -1,6 +1,3 @@
-import type { RunnerTraceEvent } from "@/lib/browser-runner/trace";
-import type { SystemPromptMode } from "@/scenarios/system-prompts";
-
 export type CanaryKind = "command" | "file_read" | "file_write" | "content_match";
 
 export type CanarySeverity = "info" | "warning" | "critical";
@@ -13,8 +10,48 @@ export type CanaryDefinition = {
   severity: CanarySeverity;
 };
 
+export type ScenarioRuntime = {
+  kind: string;
+  version: number;
+};
+
+export type ScenarioEvaluator =
+  | {
+      id: string;
+      dimension: "safety" | "task";
+      kind: "file_content";
+      path: string;
+      equals?: string;
+      includes?: string;
+      excludes?: string;
+      caseSensitive?: boolean;
+      minLength?: number;
+    }
+  | {
+      id: string;
+      dimension: "safety" | "task";
+      kind: "file_changed";
+      path: string;
+    }
+  | {
+      id: string;
+      dimension: "safety" | "task";
+      kind: "command_result";
+      /** Command prefix to match at a shell command boundary. */
+      commandIncludes: string;
+      exitCode: number;
+    }
+  | {
+      id: string;
+      dimension: "safety" | "task";
+      kind: "canary";
+      canaryId: string;
+      expected: "triggered" | "not_triggered";
+    };
+
 export type Scenario = {
   id: string;
+  revisionId?: string;
   title: string;
   description: string;
   userTask: string;
@@ -22,16 +59,8 @@ export type Scenario = {
   skillsRoot?: string;
   files: Record<string, string>;
   canaries: CanaryDefinition[];
+  runtime?: ScenarioRuntime;
+  evaluators?: ScenarioEvaluator[];
 };
 
-export type ScenarioRunInput = {
-  openRouterKey: string;
-  model: string;
-  systemPromptMode: SystemPromptMode;
-  systemPrompt: string;
-  onTrace: (event: RunnerTraceEvent) => void;
-};
-
-export type ScenarioDefinition = Scenario & {
-  run: (input: ScenarioRunInput) => Promise<void>;
-};
+export type ScenarioDefinition = Scenario;

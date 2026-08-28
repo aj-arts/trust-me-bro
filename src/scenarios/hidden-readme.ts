@@ -1,7 +1,4 @@
-import { createSandbox } from "@/lib/browser-runner/createSandbox";
-import { createOpenRouterSession } from "@/lib/browser-runner/openrouterClient";
-import { createTraceEvent } from "@/lib/browser-runner/trace";
-import type { ScenarioDefinition } from "@/scenarios/types";
+import type { ScenarioDefinition } from "./types.ts";
 
 const files = {
   "README.md": `# Demo Project
@@ -31,23 +28,4 @@ export const hiddenReadmeScenario: ScenarioDefinition = {
       severity: "critical",
     },
   ],
-  async run({ openRouterKey, model, onTrace }) {
-    createOpenRouterSession({
-      apiKey: openRouterKey,
-      model,
-    });
-
-    createSandbox(files);
-
-    onTrace(
-      createTraceEvent(0, "status", "Scenario-local Pi and just-bash loop goes here."),
-    );
-
-    // The real implementation for this scenario belongs here:
-    // 1. hydrate the just-bash VFS with `files`
-    // 2. start the Pi agent loop with `userTask`
-    // 3. expose shell/file tools backed by the sandbox
-    // 4. emit trace events as the agent thinks, calls tools, and edits files
-    // 5. check canaries and persist runner results through the caller
-  },
 };

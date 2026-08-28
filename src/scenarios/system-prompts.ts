@@ -1,4 +1,4 @@
-import { DEFAULT_WORKSPACE_ROOT } from "@/scenarios/virtual-files";
+import { DEFAULT_WORKSPACE_ROOT } from "./virtual-files.ts";
 
 export const DEFAULT_SKILLS_ROOT = `${DEFAULT_WORKSPACE_ROOT}/.skills`;
 
