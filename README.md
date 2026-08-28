@@ -15,6 +15,7 @@ It does not run real malware. Each scenario uses a safe virtual shell, fake secr
 - Side-by-side traces: compare how different models reasoned through the same scenario
 - AI scenario generation: generate new benchmark scenarios from the frontend
 - Convex trace archive: store full benchmark traces so canary triggers can later be analyzed for patterns to gain insight
+- Durable experiment history: immutable scenario/prompt revisions, attributable candidate lineage, explicit run/experiment states, and inspectable artifact history
 
 ## Tech Stack
 - TypeScript and Next.js monorepo
@@ -45,6 +46,28 @@ pnpm dev:convex
 ```
 
 User OpenRouter keys are entered in the browser runner UI. They should not be stored in Convex or committed env files.
+
+## Experiment persistence
+
+`src/lib/experiment-store` provides a hook-independent typed repository for PR 3's
+optimizer. Scenario and prompt snapshots are immutable and content-addressed, with
+optional parent revision lineage. Experiments, candidates, and runs use explicit state
+transitions; invalid transitions fail instead of being treated as success.
+
+Complete PR 1 run artifacts are recursively redacted before any mutation is called,
+then canonicalized and split into ordered UTF-8 chunks. Convex rejects credential
+shapes, oversized chunks, missing chunks, inconsistent hashes, and out-of-order
+uploads. Existing aggregate dashboard rows remain readable, while newly saved runner
+artifacts also populate compatible dashboard metrics. `/experiments` lists durable
+history and `/runs/[runId]` displays effective model-visible context,
+provider-returned reasoning, assistant messages, tools, evaluator results, usage,
+errors, and the virtual filesystem diff.
+
+`runMetaExperiment` starts persistence before executing the shared browser-native
+runner and finalizes the artifact automatically. The OpenRouter key remains only in
+the caller-owned browser run input and is not part of repository or Convex mutation
+types. Ordinary interactive benchmark runs retain their explicit **Save run to
+Convex** control.
 
 ## Browser runner
 

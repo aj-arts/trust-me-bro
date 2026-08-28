@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import {
   Bot,
   Brain,
@@ -41,6 +41,7 @@ import {
 } from "@/scenarios/system-prompts";
 import type { Scenario } from "@/scenarios/types";
 import { toVirtualFiles } from "@/scenarios/virtual-files";
+import { ConvexExperimentRepository } from "@/lib/experiment-store/repository";
 
 SyntaxHighlighter.registerLanguage("bash", bash);
 SyntaxHighlighter.registerLanguage("json", json);
@@ -995,24 +996,15 @@ function SaveRunControl(props: SaveRunControlProps) {
 }
 
 function ConnectedSaveRunControl({
-  scenario,
-  model,
   systemPromptMode,
-  events,
   runState,
   completedAt,
   result,
 }: SaveRunControlProps) {
-  const saveRun = useMutation(api.runs.save);
+  const convex = useConvex();
+  const repository = useMemo(() => new ConvexExperimentRepository(convex), [convex]);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
-  const canaryHits = canaryStatusesForEvents(scenario, events)
-    .filter((status) => status.triggered)
-    .map(({ canary }) => ({
-      id: canary.id,
-      label: canary.label,
-      severity: canary.severity,
-    }));
   const canSave = runState === "completed" && completedAt !== null && result !== null;
   const buttonLabel =
     saveState === "saving"
@@ -1028,17 +1020,7 @@ function ConnectedSaveRunControl({
     setSaveError(null);
 
     try {
-      await saveRun({
-        scenarioId: scenario.id,
-        scenarioTitle: scenario.title,
-        model,
-        systemPromptMode,
-        completedAt,
-        passed: result.artifact.evaluation.passed,
-        canaryTriggered: canaryHits.length > 0,
-        canaryHits,
-        traceEventCount: events.length,
-      });
+      await repository.persistBenchmarkRun(result, systemPromptMode);
       setSaveState("saved");
     } catch (error) {
       setSaveState("failed");
@@ -1059,7 +1041,7 @@ function ConnectedSaveRunControl({
       </button>
       <p className="mt-2 text-xs leading-5 text-muted">
         {canSave
-          ? "Saves model, scenario, prompt mode, verdict, and canary hits."
+          ? "Saves the redacted full artifact plus dashboard metrics."
           : runState === "failed"
             ? "Only completed runs with a canary verdict can be saved."
             : "Complete a run before saving it."}
@@ -1076,9 +1058,7 @@ function canaryStatusesForEvents(scenario: Scenario, events: RunnerTraceEvent[])
 
   return scenario.canaries.map((canary) => ({
     canary,
-    triggered: canaryEvents.some(
-      (event) => event.message.includes(canary.match) || scenario.canaries.length === 1,
-    ),
+    triggered: canaryEvents.some((event) => event.metadata?.canaryId === canary.id),
   }));
 }
 
