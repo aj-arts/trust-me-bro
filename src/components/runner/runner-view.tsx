@@ -29,6 +29,7 @@ import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typesc
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
 import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { createTraceEvent, type RunnerTraceEvent } from "@/lib/browser-runner/trace";
+import type { ScenarioRunResult, VirtualFileChange } from "@/lib/browser-runner/types";
 import { FloatingNav } from "@/components/floating-nav";
 import { useConvexConfigured } from "@/components/providers/convex-client-provider";
 import { buildRunnerModelGroups } from "@/lib/model-catalog";
@@ -57,6 +58,7 @@ type VisibleFileEntry = {
   path: string;
   contents: string;
   systemPromptMode?: SystemPromptMode;
+  changeKind?: VirtualFileChange["kind"];
 };
 
 const SYSTEM_PROMPT_FILE_DIRECTORY = "/.runner";
@@ -103,6 +105,7 @@ function RunnerViewShell({
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [traceEvents, setTraceEvents] = useState<RunnerTraceEvent[]>([]);
   const [runState, setRunState] = useState<RunState>("idle");
+  const [runResult, setRunResult] = useState<ScenarioRunResult | null>(null);
   const [completedAt, setCompletedAt] = useState<number | null>(null);
   const [runKey, setRunKey] = useState(0);
   const modelGroups = useMemo(() => buildRunnerModelGroups(savedModelIds), [savedModelIds]);
@@ -124,13 +127,28 @@ function RunnerViewShell({
     }),
     [scenario.skillsRoot, scenario.workspaceRoot, selectedSystemPromptMode.fileName, systemPromptMode],
   );
-  const fileEntries = useMemo<VisibleFileEntry[]>(
-    () => [
+  const fileEntries = useMemo<VisibleFileEntry[]>(() => {
+    const files = runResult?.artifact.files.final ?? virtualFiles;
+    const diff = runResult?.artifact.files.diff ?? [];
+    const changes = new Map(diff.map((change) => [change.path, change.kind]));
+    const deletedEntries = diff
+      .filter((change) => change.kind === "deleted")
+      .map((change) => ({
+        path: change.path,
+        contents: change.before ?? "",
+        changeKind: change.kind,
+      }));
+
+    return [
       systemPromptFile,
-      ...Object.entries(virtualFiles).map(([path, contents]) => ({ path, contents })),
-    ],
-    [systemPromptFile, virtualFiles],
-  );
+      ...Object.entries(files).map(([path, contents]) => ({
+        path,
+        contents,
+        changeKind: changes.get(path),
+      })),
+      ...deletedEntries,
+    ];
+  }, [runResult, systemPromptFile, virtualFiles]);
   const isSystemPromptFileSelected =
     selectedFile?.startsWith(`${SYSTEM_PROMPT_FILE_DIRECTORY}/`) ?? false;
   const selectedFileEntry = isSystemPromptFileSelected
@@ -154,13 +172,14 @@ function RunnerViewShell({
     setSelectedFile(null);
     setRunState("running");
     setCompletedAt(null);
+    setRunResult(null);
     setTraceEvents([]);
     setRunKey((current) => current + 1);
 
     try {
       const { runScenario } = await import("@/lib/browser-runner/runScenario");
 
-      await runScenario({
+      const result = await runScenario({
         scenario,
         openRouterKey,
         model,
@@ -169,8 +188,10 @@ function RunnerViewShell({
           setTraceEvents((currentEvents) => upsertTraceEvent(currentEvents, event));
         },
       });
-      setCompletedAt(Date.now());
-      setRunState("completed");
+      setTraceEvents(result.artifact.traceEvents);
+      setRunResult(result);
+      setCompletedAt(result.artifact.completedAt);
+      setRunState(result.status === "completed" ? "completed" : "failed");
     } catch (error) {
       setRunState("failed");
       setCompletedAt(null);
@@ -233,6 +254,7 @@ function RunnerViewShell({
                       path={entry.path}
                       selected={entrySelected}
                       systemPromptMode={entry.systemPromptMode}
+                      changeKind={entry.changeKind}
                       onSelect={() => setSelectedFile(entrySelected ? null : entry.path)}
                     />
                   );
@@ -300,6 +322,7 @@ function RunnerViewShell({
                 scenario={scenario}
                 events={traceEvents}
                 runState={runState}
+                result={runResult}
               />
               <SaveRunControl
                 key={runKey}
@@ -310,6 +333,7 @@ function RunnerViewShell({
                 events={traceEvents}
                 runState={runState}
                 completedAt={completedAt}
+                result={runResult}
               />
             </section>
           </div>
@@ -353,10 +377,17 @@ type FileTreeButtonProps = {
   path: string;
   selected: boolean;
   systemPromptMode?: SystemPromptMode;
+  changeKind?: VirtualFileChange["kind"];
   onSelect: () => void;
 };
 
-function FileTreeButton({ path, selected, systemPromptMode, onSelect }: FileTreeButtonProps) {
+function FileTreeButton({
+  path,
+  selected,
+  systemPromptMode,
+  changeKind,
+  onSelect,
+}: FileTreeButtonProps) {
   const segments = path.split("/");
   const name = segments[segments.length - 1];
   const directory = segments.slice(0, -1).join("/");
@@ -393,6 +424,10 @@ function FileTreeButton({ path, selected, systemPromptMode, onSelect }: FileTree
       {systemPromptStyle && modeLabel ? (
         <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${systemPromptStyle.badge}`}>
           {modeLabel}
+        </span>
+      ) : changeKind ? (
+        <span className="shrink-0 rounded border border-[rgba(245,180,30,0.3)] bg-[rgba(245,180,30,0.12)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning">
+          {changeKind}
         </span>
       ) : null}
     </button>
@@ -546,7 +581,7 @@ function TraceConversation({
   density,
 }: TraceConversationProps) {
   const compact = density === "compact";
-  const visibleEvents = events.filter((event) => event.type !== "status" && event.type !== "tool_call");
+  const visibleEvents = events.filter((event) => event.type !== "status");
   const latestEvent = visibleEvents.at(-1);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -869,6 +904,7 @@ type CanaryVerdictProps = {
   scenario: Scenario;
   events: RunnerTraceEvent[];
   runState: RunState;
+  result: ScenarioRunResult | null;
 };
 
 type SaveRunControlProps = {
@@ -879,20 +915,24 @@ type SaveRunControlProps = {
   events: RunnerTraceEvent[];
   runState: RunState;
   completedAt: number | null;
+  result: ScenarioRunResult | null;
 };
 
-function CanaryVerdict({ scenario, events, runState }: CanaryVerdictProps) {
+function CanaryVerdict({ scenario, events, runState, result }: CanaryVerdictProps) {
   const canaryStatuses = canaryStatusesForEvents(scenario, events);
   const canaryTriggered = canaryStatuses.some((status) => status.triggered);
+  const taskFailed = result?.artifact.evaluation.task.status === "failed";
   const verdict = canaryTriggered
     ? canaryVerdictStyles.triggered
-    : runState === "completed"
-      ? canaryVerdictStyles.passed
-      : runState === "failed"
-        ? canaryVerdictStyles.failed
-        : runState === "running"
-          ? canaryVerdictStyles.running
-          : canaryVerdictStyles.idle;
+    : runState === "failed"
+      ? canaryVerdictStyles.failed
+      : taskFailed
+        ? canaryVerdictStyles.taskFailed
+        : runState === "completed"
+          ? canaryVerdictStyles.passed
+          : runState === "running"
+            ? canaryVerdictStyles.running
+            : canaryVerdictStyles.idle;
   const Icon = verdict.icon;
 
   return (
@@ -961,6 +1001,7 @@ function ConnectedSaveRunControl({
   events,
   runState,
   completedAt,
+  result,
 }: SaveRunControlProps) {
   const saveRun = useMutation(api.runs.save);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
@@ -972,7 +1013,7 @@ function ConnectedSaveRunControl({
       label: canary.label,
       severity: canary.severity,
     }));
-  const canSave = runState === "completed" && completedAt !== null;
+  const canSave = runState === "completed" && completedAt !== null && result !== null;
   const buttonLabel =
     saveState === "saving"
       ? "Saving"
@@ -993,7 +1034,7 @@ function ConnectedSaveRunControl({
         model,
         systemPromptMode,
         completedAt,
-        passed: canaryHits.length === 0,
+        passed: result.artifact.evaluation.passed,
         canaryTriggered: canaryHits.length > 0,
         canaryHits,
         traceEventCount: events.length,
@@ -1072,6 +1113,14 @@ const canaryVerdictStyles = {
     frame: "border-[rgba(240,84,74,0.35)] bg-[rgba(240,84,74,0.09)] text-[#f3a39c]",
     iconBg: "bg-[rgba(240,84,74,0.18)]",
     iconClass: "text-danger",
+    icon: TriangleAlert,
+  },
+  taskFailed: {
+    title: "Task incomplete",
+    description: "The safety boundary held, but deterministic task checks did not pass.",
+    frame: "border-[rgba(245,180,30,0.35)] bg-[rgba(245,180,30,0.09)] text-[#f3d78d]",
+    iconBg: "bg-[rgba(245,180,30,0.18)]",
+    iconClass: "text-warning",
     icon: TriangleAlert,
   },
   failed: {

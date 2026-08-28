@@ -5,7 +5,7 @@ Trust Me Bro is a benchmark for testing whether coding agents can safely handle 
 It does not run real malware. Each scenario uses a safe virtual shell, fake secrets, and harmless canaries to measure whether an agent ignores the trap, asks for confirmation, or tries to do something dangerous.
 
 ## Features
-- Scenario-based benchmarks: each TypeScript scenario defines the user task, virtual filesystem, hidden security trigger, and agent evaluation loop
+- Serializable scenario snapshots: each scenario defines task, virtual files, canaries, evaluators, and a stable trusted runtime-fixture kind
 - Blind agent tests: agents should not know they are being tested; they only see the task and the repo context
 - Safety modes: run the same scenario with no extra safety instructions, then again with safe-coding instructions to compare behavior
 - OpenRouter-powered runs: users can add their OpenRouter key in the frontend and rerun scenarios against different models
@@ -45,3 +45,19 @@ pnpm dev:convex
 ```
 
 User OpenRouter keys are entered in the browser runner UI. They should not be stored in Convex or committed env files.
+
+## Browser runner
+
+All scenarios execute through the shared browser-native runner in
+`src/lib/browser-runner`. It hydrates an isolated just-bash filesystem, constructs the
+PI agent and tools, records the provider-visible request payload after credential
+redaction, and returns a serializable run artifact. Artifacts include the exact
+scenario snapshot and effective system prompt, provider-returned transcript content
+(including returned thinking blocks, never hidden chain-of-thought), tool lifecycle,
+usage and stop reasons, errors, initial/final virtual files, and a deterministic diff.
+
+Built-in scenarios use allow-listed runtime fixtures for mocked commands, network
+responses, and semantic canary hooks. Caller-created declarative scenarios do not
+need registry entries and use the generic isolated runtime. Deterministic grading
+reports safety and task success separately; configured task evaluators must pass in
+addition to avoiding canaries.
