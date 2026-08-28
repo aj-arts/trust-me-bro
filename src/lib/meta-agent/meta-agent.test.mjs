@@ -10,6 +10,7 @@ import { aggregateScores, compareAggregates, scoreArtifact } from "./scoring.ts"
 import { DEFAULT_OPTIMIZER_LIMITS, ProposalValidationError } from "./types.ts";
 import { validateAndApplyProposal } from "./validation.ts";
 import { createCustomScenario } from "./authoring.ts";
+import { OptimizerLeaseConflictError } from "../experiment-store/repository.ts";
 
 function seedScenario() {
   return createScenarioSnapshot({
@@ -213,6 +214,7 @@ test("budget enforcement stops before reserved work crosses a limit", () => {
     ...DEFAULT_OPTIMIZER_LIMITS,
     maxEvaluatedRuns: 1,
     maxEvaluatedAgentTokens: 4_000,
+    maxReservedTokensPerEvaluatedRun: 4_000,
   });
   budget.assertCanRun();
   budget.consumeRun(10, 0);
@@ -269,7 +271,7 @@ test("controller rejects a non-improving candidate", async () => {
     repository,
     experimentId,
     name: "Reject",
-    objective: "Reject equal candidates.",
+    objective: configuration(experimentId).objective,
     seed: { scenario: seedScenario(), prompt },
   });
   const proposer = new FakeProposer((request) => ({
@@ -294,7 +296,7 @@ test("controller surfaces failures, cancellation, and baseline resume", async ()
     repository: failingRepository,
     experimentId: "failure",
     name: "Failure",
-    objective: "Fail explicitly.",
+    objective: configuration("failure").objective,
     seed: { scenario: seedScenario(), prompt },
   });
   await assert.rejects(
@@ -314,7 +316,7 @@ test("controller surfaces failures, cancellation, and baseline resume", async ()
     repository: cancelledRepository,
     experimentId: "cancelled",
     name: "Cancelled",
-    objective: "Cancel explicitly.",
+    objective: configuration("cancelled").objective,
     seed: { scenario: seedScenario(), prompt },
   });
   const abort = new AbortController();
@@ -334,7 +336,7 @@ test("controller surfaces failures, cancellation, and baseline resume", async ()
     repository: resumeRepository,
     experimentId: "resume",
     name: "Resume",
-    objective: "Resume from a persisted baseline.",
+    objective: configuration("resume").objective,
     seed: { scenario: seedScenario(), prompt },
   });
   await resumeRepository.startExperiment("resume");
@@ -372,7 +374,7 @@ test("blue-team rejection keeps accepted lineage for a later iteration", async (
     repository,
     experimentId,
     name: "Blue lineage",
-    objective: "Improve safety without refusing.",
+    objective: configuration(experimentId).objective,
     seed: { scenario: seedScenario(), prompt },
   });
   let proposalIndex = 0;
@@ -423,7 +425,7 @@ test("blue-team rejection keeps accepted lineage for a later iteration", async (
         maxCandidates: 2,
         maxEvaluatedRuns: 3,
         maxProposalTokens: 100,
-        maxEvaluatedAgentTokens: 12_000,
+        maxEvaluatedAgentTokens: 24_000,
         maxEstimatedSpendUsd: 0.5,
       },
       proposalLimits: {
@@ -455,7 +457,7 @@ test("repeats and a holdout model remain sequential and budgeted", async () => {
     repository,
     experimentId,
     name: "Repeats and holdout",
-    objective: "Compare paired repeated runs.",
+    objective: configuration(experimentId).objective,
     seed: { scenario: seedScenario(), prompt },
   });
   const agent = new FakeAgent();
@@ -473,7 +475,7 @@ test("repeats and a holdout model remain sequential and budgeted", async () => {
         ...DEFAULT_OPTIMIZER_LIMITS,
         repeats: 2,
         maxEvaluatedRuns: 8,
-        maxEvaluatedAgentTokens: 32_000,
+        maxEvaluatedAgentTokens: 64_000,
         maxEstimatedSpendUsd: 0.5,
       },
       holdout: { evaluatedModelId: "fake/holdout" },
@@ -491,7 +493,7 @@ test("cancellation after inference persists the completed paid run before stoppi
     repository,
     experimentId,
     name: "Cancel after run",
-    objective: "Persist before observing cancellation.",
+    objective: configuration(experimentId).objective,
     seed: { scenario: seedScenario(), prompt },
   });
   const abort = new AbortController();
@@ -512,6 +514,316 @@ test("cancellation after inference persists the completed paid run before stoppi
   assert.equal(result.phase, "cancelled");
   assert.equal(detail.experiment.status, "cancelled");
   assert.equal(detail.runs[0].status, "completed");
+});
+
+test("resume rejects changed configuration and seed before inference", async () => {
+  const repository = new MemoryRepository();
+  const experimentId = "immutable-resume";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Immutable resume",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  await runOptimizer({
+    repository,
+    proposer: new FakeProposer((request) => ({
+      ...proposal(),
+      parentScenarioRevisionId: request.scenario.revisionId,
+      parentPromptRevisionId: request.promptRevisionId,
+    })),
+    evaluatedAgent: new FakeAgent(),
+    configuration: configuration(experimentId),
+    seed: createdSeed,
+  });
+  const proposer = new FakeProposer(() => proposal());
+
+  await assert.rejects(
+    runOptimizer({
+      repository,
+      proposer,
+      evaluatedAgent: new FakeAgent(),
+      configuration: { ...configuration(experimentId), mode: "blue-team" },
+      seed: createdSeed,
+    }),
+    /configuration does not match/,
+  );
+  assert.equal(proposer.calls, 0);
+});
+
+test("candidate run sets are preflighted before paid proposal inference", async () => {
+  const repository = new MemoryRepository();
+  const experimentId = "run-set-preflight";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Run set preflight",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  const proposer = new FakeProposer(() => proposal());
+
+  await assert.rejects(
+    runOptimizer({
+      repository,
+      proposer,
+      evaluatedAgent: new FakeAgent(),
+      configuration: {
+        ...configuration(experimentId),
+        limits: {
+          ...DEFAULT_OPTIMIZER_LIMITS,
+          repeats: 2,
+          maxEvaluatedRuns: 3,
+          maxEvaluatedAgentTokens: 32_000,
+        },
+      },
+      seed: createdSeed,
+    }),
+    /budget exhausted: evaluatedRuns/,
+  );
+  const detail = await repository.loadExperiment(experimentId);
+  assert.equal(proposer.calls, 0);
+  assert.equal(detail.runs.length, 2);
+});
+
+test("failed and cancelled evaluated calls terminate their persisted runs", async () => {
+  for (const [experimentId, failure] of [
+    ["run-error", new Error("agent failed")],
+    ["run-abort", new DOMException("cancelled", "AbortError")],
+  ]) {
+    const repository = new MemoryRepository();
+    const createdSeed = await createOptimizerExperiment({
+      repository,
+      experimentId,
+      name: experimentId,
+      objective: configuration(experimentId).objective,
+      seed: { scenario: seedScenario(), prompt },
+    });
+    const result = runOptimizer({
+      repository,
+      proposer: new FakeProposer(() => proposal()),
+      evaluatedAgent: { run: async () => { throw failure; } },
+      configuration: configuration(experimentId),
+      seed: createdSeed,
+    });
+    if (failure.name === "AbortError") {
+      assert.equal((await result).phase, "cancelled");
+    } else {
+      await assert.rejects(result, /agent failed/);
+    }
+    const detail = await repository.loadExperiment(experimentId);
+    assert.equal(detail.runs[0].status, "failed");
+  }
+});
+
+test("truncated history and unresolved proposal reservations stop before inference", async () => {
+  const truncated = new MemoryRepository();
+  const truncatedId = "truncated";
+  const truncatedSeed = await createOptimizerExperiment({
+    repository: truncated,
+    experimentId: truncatedId,
+    name: "Truncated",
+    objective: configuration(truncatedId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  truncated.historyTruncated = true;
+  const truncatedProposer = new FakeProposer(() => proposal());
+  await assert.rejects(
+    runOptimizer({
+      repository: truncated,
+      proposer: truncatedProposer,
+      evaluatedAgent: new FakeAgent(),
+      configuration: configuration(truncatedId),
+      seed: truncatedSeed,
+    }),
+    /history is truncated/,
+  );
+  assert.equal(truncatedProposer.calls, 0);
+
+  const reserved = new MemoryRepository();
+  const reservedId = "reserved";
+  const reservedSeed = await createOptimizerExperiment({
+    repository: reserved,
+    experimentId: reservedId,
+    name: "Reserved",
+    objective: configuration(reservedId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  await reserved.startExperiment(reservedId);
+  reserved.experiments.get(reservedId).proposalReservation = {
+    attemptId: "previous-process",
+    candidateId: `candidate-${reservedId}-1`,
+    modelId: "fake/proposer",
+    maxTokens: 100,
+    estimatedCostUsd: 0.01,
+    reservedAt: 1,
+  };
+  const reservedProposer = new FakeProposer(() => proposal());
+  const waiting = await runOptimizer({
+    repository: reserved,
+    proposer: reservedProposer,
+    evaluatedAgent: new FakeAgent(),
+    configuration: configuration(reservedId),
+    seed: reservedSeed,
+  });
+  assert.equal(waiting.phase, "waiting");
+  assert.match(waiting.message, /refusing duplicate inference/);
+  assert.equal(reservedProposer.calls, 0);
+});
+
+test("invalid limits are rejected before immutable configuration binding", async () => {
+  const repository = new MemoryRepository();
+  const experimentId = "invalid-config";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Invalid config",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  await assert.rejects(
+    runOptimizer({
+      repository,
+      proposer: new FakeProposer(() => proposal()),
+      evaluatedAgent: new FakeAgent(),
+      configuration: {
+        ...configuration(experimentId),
+        limits: {
+          ...DEFAULT_OPTIMIZER_LIMITS,
+          maxReservedTokensPerEvaluatedRun: 1,
+        },
+      },
+      seed: createdSeed,
+    }),
+    /reservation cannot be smaller/,
+  );
+  assert.equal(repository.experiments.get(experimentId).configurationJson, undefined);
+});
+
+test("run lease contention returns waiting without failing the experiment", async () => {
+  const repository = new MemoryRepository();
+  repository.forceRunLeaseConflict = true;
+  const experimentId = "lease-conflict";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Lease conflict",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  const result = await runOptimizer({
+    repository,
+    proposer: new FakeProposer(() => proposal()),
+    evaluatedAgent: new FakeAgent(),
+    configuration: configuration(experimentId),
+    seed: createdSeed,
+  });
+  assert.equal(result.phase, "waiting");
+  assert.equal(repository.experiments.get(experimentId).status, "running");
+});
+
+test("a persisted running lease returns waiting without failing the experiment", async () => {
+  const repository = new MemoryRepository();
+  const experimentId = "persisted-lease";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Persisted lease",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  await repository.startExperiment(experimentId);
+  await repository.beginRun({
+    runId: `run-${experimentId}-baseline-0-primary-1`,
+    source: "experiment",
+    experimentId,
+    scenario: createdSeed.scenario,
+    effectiveSystemPrompt: createdSeed.prompt.systemPrompt,
+    systemPromptMode: createdSeed.prompt.systemPromptMode,
+    model: "fake/evaluated",
+    startedAt: 1,
+  });
+
+  const result = await runOptimizer({
+    repository,
+    proposer: new FakeProposer(() => proposal()),
+    evaluatedAgent: new FakeAgent(),
+    configuration: configuration(experimentId),
+    seed: createdSeed,
+  });
+  assert.equal(result.phase, "waiting");
+  assert.equal(repository.experiments.get(experimentId).status, "running");
+});
+
+test("a run completed after the history read is reused and charged once", async () => {
+  const repository = new MemoryRepository();
+  const experimentId = "completed-race";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Completed race",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  await repository.startExperiment(experimentId);
+  const baseline = artifact({
+    runId: `run-${experimentId}-baseline-0-primary-1`,
+    safety: "passed",
+    task: "passed",
+  });
+  await repository.beginRun({
+    runId: baseline.runId,
+    source: "experiment",
+    experimentId,
+    scenario: createdSeed.scenario,
+    effectiveSystemPrompt: createdSeed.prompt.systemPrompt,
+    systemPromptMode: createdSeed.prompt.systemPromptMode,
+    model: "fake/evaluated",
+    startedAt: 1,
+  });
+  await repository.finishRun({ status: "completed", artifact: baseline });
+  repository.hideCompletedRunsUntilBegin = true;
+  const agent = new FakeAgent();
+  const result = await runOptimizer({
+    repository,
+    proposer: new FakeProposer((request) => ({
+      ...proposal(),
+      parentScenarioRevisionId: request.scenario.revisionId,
+      parentPromptRevisionId: request.promptRevisionId,
+    })),
+    evaluatedAgent: agent,
+    configuration: configuration(experimentId),
+    seed: createdSeed,
+  });
+
+  assert.equal(agent.calls, 1);
+  assert.equal(result.budget.consumed.evaluatedRuns, 2);
+});
+
+test("a candidate appearing during reservation returns waiting before inference", async () => {
+  const repository = new MemoryRepository();
+  repository.forceCandidateLeaseConflict = true;
+  const experimentId = "candidate-race";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Candidate race",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  const proposer = new FakeProposer(() => proposal());
+  const result = await runOptimizer({
+    repository,
+    proposer,
+    evaluatedAgent: new FakeAgent(),
+    configuration: configuration(experimentId),
+    seed: createdSeed,
+  });
+
+  assert.equal(result.phase, "waiting");
+  assert.equal(proposer.calls, 0);
+  assert.equal(repository.experiments.get(experimentId).status, "running");
 });
 
 function configuration(experimentId) {
@@ -568,10 +880,12 @@ function artifact({ runId, safety, task, cost = 0.001 }) {
 
 class FakeProposer {
   modelId = "fake/proposer";
+  calls = 0;
   constructor(factory) {
     this.factory = factory;
   }
   async generate(request) {
+    this.calls += 1;
     return {
       output: JSON.stringify(this.factory(request)),
       inputTokens: 10,
@@ -600,6 +914,10 @@ class MemoryRepository {
   runs = new Map();
   scenarioRevisions = new Map();
   promptRevisions = new Map();
+  historyTruncated = false;
+  forceRunLeaseConflict = false;
+  forceCandidateLeaseConflict = false;
+  hideCompletedRunsUntilBegin = false;
 
   async createScenarioRevision(snapshot, parentRevisionId) {
     const revision = await prepareScenarioRevision(snapshot);
@@ -623,6 +941,32 @@ class MemoryRepository {
   }
   async startExperiment(id) {
     this.experiments.get(id).status = "running";
+  }
+  async bindOptimizerConfiguration(id, configurationJson) {
+    const experiment = this.experiments.get(id);
+    if (experiment.configurationJson && experiment.configurationJson !== configurationJson) {
+      throw new Error("Optimizer configuration does not match the persisted experiment.");
+    }
+    experiment.configurationJson = configurationJson;
+  }
+  async reserveProposalAttempt(input) {
+    const experiment = this.experiments.get(input.experimentId);
+    if (this.forceCandidateLeaseConflict) {
+      throw new OptimizerLeaseConflictError("The deterministic candidate already exists.");
+    }
+    if (this.candidates.has(input.candidateId)) {
+      throw new OptimizerLeaseConflictError("The deterministic candidate already exists.");
+    }
+    if (experiment.proposalReservation?.attemptId !== input.attemptId && experiment.proposalReservation) {
+      throw new Error("Another proposal attempt is already reserved.");
+    }
+    experiment.proposalReservation = { ...input, reservedAt: Date.now() };
+  }
+  async completeProposalAttempt(experimentId, attemptId) {
+    const experiment = this.experiments.get(experimentId);
+    if (experiment.proposalReservation?.attemptId === attemptId) {
+      delete experiment.proposalReservation;
+    }
   }
   async completeExperiment(id) {
     this.experiments.get(id).status = "completed";
@@ -650,9 +994,13 @@ class MemoryRepository {
       candidates: [...this.candidates.values()].filter((value) => value.experimentId === experimentId),
       runs: [...this.runs.values()]
         .filter((value) => value.summary.experimentId === experimentId)
+        .filter(
+          (value) =>
+            !this.hideCompletedRunsUntilBegin || value.summary.status !== "completed",
+        )
         .map((value) => value.summary),
       candidatesTruncated: false,
-      runsTruncated: false,
+      runsTruncated: this.historyTruncated,
     };
   }
   async loadCandidateAncestry(candidateId) {
@@ -665,21 +1013,30 @@ class MemoryRepository {
     throw new Error("Not needed.");
   }
   async beginRun(input) {
-    if (!this.runs.has(input.runId)) {
-      this.runs.set(input.runId, {
-        summary: {
-          runId: input.runId,
-          experimentId: input.experimentId,
-          candidateId: input.candidateId,
-          scenarioId: input.scenario.id,
-          scenarioTitle: input.scenario.title,
-          model: input.model,
-          systemPromptMode: input.systemPromptMode,
-          status: "running",
-          passed: false,
-        },
-      });
+    if (this.forceRunLeaseConflict) {
+      throw new OptimizerLeaseConflictError(`Run ${input.runId} is already owned.`);
     }
+    if (this.runs.has(input.runId)) {
+      if (this.runs.get(input.runId).summary.status === "completed") {
+        this.hideCompletedRunsUntilBegin = false;
+        return "completed";
+      }
+      throw new OptimizerLeaseConflictError(`Run ${input.runId} is already owned.`);
+    }
+    this.runs.set(input.runId, {
+      summary: {
+        runId: input.runId,
+        experimentId: input.experimentId,
+        candidateId: input.candidateId,
+        scenarioId: input.scenario.id,
+        scenarioTitle: input.scenario.title,
+        model: input.model,
+        systemPromptMode: input.systemPromptMode,
+        status: "running",
+        passed: false,
+      },
+    });
+    return "started";
   }
   async finishRun(result) {
     const stored = this.runs.get(result.artifact.runId);
@@ -689,6 +1046,13 @@ class MemoryRepository {
     stored.run = stored.summary;
     stored.scenarioRevision = {};
     stored.promptRevision = {};
+  }
+  async abortRun(runId, reason) {
+    const stored = this.runs.get(runId);
+    if (stored && stored.summary.status !== "completed") {
+      stored.summary.status = "failed";
+      stored.summary.failureReason = reason;
+    }
   }
   async persistBenchmarkRun() {
     throw new Error("Not needed.");

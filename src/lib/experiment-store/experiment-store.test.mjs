@@ -5,7 +5,10 @@ import { createScenarioSnapshot } from "../browser-runner/scenarioSnapshot.ts";
 import {
   assertCandidateTransition,
   assertExperimentTransition,
+  assertMetaAgentLabEnabled,
   assertRunTransition,
+  assertComparableStoredRun,
+  assertStoredArtifactMatchesRun,
   chunkArtifact,
   parseStoredRunArtifact,
   preparePromptRevision,
@@ -13,6 +16,7 @@ import {
   reassembleArtifactChunks,
   serializeRunArtifact,
   sha256,
+  shouldAssignBaseline,
 } from "./core.ts";
 import { ConvexExperimentRepository } from "./repository.ts";
 
@@ -168,6 +172,50 @@ test("invalid experiment, candidate, and run transitions are explicit", () => {
   assert.throws(() => assertRunTransition("failed", "completed"), /Invalid run transition/);
 });
 
+test("only finalized validated artifacts are comparable and eligible as baselines", async () => {
+  assert.throws(
+    () => assertComparableStoredRun({ status: "running", artifactChunkCount: 1 }),
+    /successfully finalized/,
+  );
+  assert.throws(
+    () => assertComparableStoredRun({ status: "completed", artifactChunkCount: 0 }),
+    /successfully finalized/,
+  );
+  assert.doesNotThrow(() =>
+    assertComparableStoredRun({ status: "completed", artifactChunkCount: 1 }),
+  );
+  assert.equal(shouldAssignBaseline("failed"), true);
+  assert.equal(shouldAssignBaseline("completed"), false);
+
+  const artifact = artifactFixture();
+  const serialized = await serializeRunArtifact(artifact);
+  const scenarioRevision = await prepareScenarioRevision(artifact.scenario);
+  assert.doesNotThrow(() =>
+    assertStoredArtifactMatchesRun({
+      artifact,
+      artifactJson: serialized.artifactJson,
+      runId: artifact.runId,
+      model: artifact.model,
+      scenarioRevisionId: artifact.scenario.revisionId,
+      scenarioSnapshotJson: scenarioRevision.snapshotJson,
+      promptSystemPrompt: artifact.effectiveSystemPrompt,
+    }),
+  );
+  assert.throws(
+    () =>
+      assertStoredArtifactMatchesRun({
+        artifact,
+        artifactJson: serialized.artifactJson,
+        runId: "other-run",
+        model: artifact.model,
+        scenarioRevisionId: artifact.scenario.revisionId,
+        scenarioSnapshotJson: scenarioRevision.snapshotJson,
+        promptSystemPrompt: artifact.effectiveSystemPrompt,
+      }),
+    /identity does not match/,
+  );
+});
+
 test("run artifacts round trip through redaction, chunking, and parsing", async () => {
   const artifact = artifactFixture();
   const serialized = await serializeRunArtifact(artifact);
@@ -233,6 +281,7 @@ test("repository aborts a run whose artifact cannot fit bounded storage", async 
       throw new Error("Unexpected query.");
     },
   });
+
   const artifact = artifactFixture({
     transcript: ["x".repeat(4 * 1024 * 1024)],
   });
@@ -244,4 +293,9 @@ test("repository aborts a run whose artifact cannot fit bounded storage", async 
   assert.ok(
     mutations.some((args) => args.runId === artifact.runId && args.reason === "artifact_too_large"),
   );
+});
+
+test("meta-agent Convex access fails closed without explicit local-only opt-in", () => {
+  assert.throws(() => assertMetaAgentLabEnabled(false), /disabled unless/);
+  assert.doesNotThrow(() => assertMetaAgentLabEnabled(true));
 });

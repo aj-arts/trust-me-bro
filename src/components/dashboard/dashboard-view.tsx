@@ -27,6 +27,7 @@ import { PromptRobustnessChart } from "@/components/dashboard/charts/prompt-robu
 import { ScenarioHeatmap } from "@/components/dashboard/charts/scenario-heatmap";
 import { ScenarioDifficultyChart } from "@/components/dashboard/charts/scenario-difficulty-chart";
 import { FloatingNav } from "@/components/floating-nav";
+import { useConvexConfigured } from "@/components/providers/convex-client-provider";
 
 function fmt(n: number): string {
   return n.toLocaleString();
@@ -36,11 +37,19 @@ type DashboardData = typeof mockDashboardData;
 
 export function DashboardView() {
   const [mode, setMode] = useState<PromptModeId>(DEFAULT_PROMPT_MODE);
+  const convexConfigured = useConvexConfigured();
 
-  return (
+  return convexConfigured ? (
     <RealDashboardView
       mode={mode}
       onModeChange={setMode}
+    />
+  ) : (
+    <DashboardShell
+      mode={mode}
+      onModeChange={setMode}
+      data={mockDashboardData}
+      sourceLabel="Demo data"
     />
   );
 }
@@ -64,6 +73,7 @@ function RealDashboardView({
       onModeChange={onModeChange}
       data={data}
       loading={savedRuns === undefined}
+      sourceLabel={savedRuns === undefined ? "Loading Convex" : "Convex data"}
     />
   );
 }
@@ -73,17 +83,17 @@ function DashboardShell({
   onModeChange,
   data,
   loading = false,
+  sourceLabel,
 }: {
   mode: PromptModeId;
   onModeChange: (mode: PromptModeId) => void;
   data: DashboardData;
   loading?: boolean;
+  sourceLabel: string;
 }) {
   const activeMode = promptModes.find((m) => m.id === mode)!;
   const modeRuns = data.totalRuns(mode);
   const firstRunnable = runnableScenarios[0]?.id ?? "";
-  const sourceLabel = loading ? "Loading Convex" : "Convex data";
-
   return (
     <div className="deck-root min-h-screen">
       <TooltipBoundary>

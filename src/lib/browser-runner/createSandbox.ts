@@ -2,6 +2,8 @@ import { Bash, type BashOptions } from "just-bash/browser";
 import { toVirtualFiles } from "../../scenarios/virtual-files.ts";
 import type { VirtualFileChange, VirtualFiles } from "./types.ts";
 
+const VIRTUAL_SYMLINK_PREFIX = "\u0000trust-me-bro:symlink:";
+
 export type BrowserSandbox = {
   bash: Bash;
   workspaceRoot: string;
@@ -30,13 +32,21 @@ export async function snapshotSandboxFiles(sandbox: BrowserSandbox): Promise<Vir
   const paths = [...sandbox.bash.fs.getAllPaths()].sort();
 
   for (const path of paths) {
-    const stat = await sandbox.bash.fs.stat(path);
+    const stat = await sandbox.bash.fs.lstat(path);
+    if (stat.isSymbolicLink) {
+      files[path] = `${VIRTUAL_SYMLINK_PREFIX}${await sandbox.bash.fs.readlink(path)}`;
+      continue;
+    }
     if (stat.isFile) {
       files[path] = await sandbox.bash.fs.readFile(path);
     }
   }
 
   return files;
+}
+
+export function isVirtualSymlink(value: string | undefined) {
+  return value?.startsWith(VIRTUAL_SYMLINK_PREFIX) ?? false;
 }
 
 export function diffVirtualFiles(

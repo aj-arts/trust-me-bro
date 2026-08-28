@@ -40,6 +40,17 @@ export default defineSchema({
     objective: v.string(),
     scenarioRevisionId: v.string(),
     promptRevisionId: v.string(),
+    configurationJson: v.optional(v.string()),
+    proposalReservation: v.optional(
+      v.object({
+        attemptId: v.string(),
+        candidateId: v.string(),
+        modelId: v.string(),
+        maxTokens: v.number(),
+        estimatedCostUsd: v.number(),
+        reservedAt: v.number(),
+      }),
+    ),
     status: v.union(
       v.literal("draft"),
       v.literal("running"),
@@ -112,6 +123,7 @@ export default defineSchema({
     status: v.optional(
       v.union(v.literal("running"), v.literal("completed"), v.literal("failed")),
     ),
+    attemptId: v.optional(v.string()),
     experimentId: v.optional(v.string()),
     candidateId: v.optional(v.string()),
     scenarioRevisionId: v.optional(v.string()),
@@ -120,7 +132,12 @@ export default defineSchema({
     failedAt: v.optional(v.number()),
     failureMessage: v.optional(v.string()),
     failureCode: v.optional(
-      v.union(v.literal("artifact_too_large"), v.literal("artifact_serialization_failed")),
+      v.union(
+        v.literal("artifact_too_large"),
+        v.literal("artifact_serialization_failed"),
+        v.literal("execution_failed"),
+        v.literal("cancelled"),
+      ),
     ),
     artifactHash: v.optional(v.string()),
     artifactByteLength: v.optional(v.number()),

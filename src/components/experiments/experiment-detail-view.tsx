@@ -4,8 +4,19 @@ import { useQuery } from "convex/react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
+import { useMetaAgentLabConfigured } from "@/components/providers/convex-client-provider";
+import { MetaAgentUnavailable } from "./meta-agent-unavailable";
 
 export function ExperimentDetailView({ experimentId }: { experimentId: string }) {
+  const configured = useMetaAgentLabConfigured();
+  return configured ? (
+    <ConnectedExperimentDetailView experimentId={experimentId} />
+  ) : (
+    <MetaAgentUnavailable active="experiments" />
+  );
+}
+
+function ConnectedExperimentDetailView({ experimentId }: { experimentId: string }) {
   const detail = useQuery(api.experiments.getDetail, { experimentId });
 
   return (

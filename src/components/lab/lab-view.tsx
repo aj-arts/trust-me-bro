@@ -5,11 +5,11 @@ import { useConvex } from "convex/react";
 import Link from "next/link";
 import { FlaskConical, OctagonX, Play, RotateCcw, ShieldCheck } from "lucide-react";
 import { FloatingNav } from "@/components/floating-nav";
+import { MetaAgentUnavailable } from "@/components/experiments/meta-agent-unavailable";
+import { useMetaAgentLabConfigured } from "@/components/providers/convex-client-provider";
 import { createScenarioSnapshot } from "@/lib/browser-runner/scenarioSnapshot";
 import { ConvexExperimentRepository, createExperimentId } from "@/lib/experiment-store/repository";
 import { createCustomScenario } from "@/lib/meta-agent/authoring";
-import { createOptimizerExperiment, runOptimizer } from "@/lib/meta-agent/controller";
-import { BrowserEvaluatedAgent, OpenRouterProposalGenerator } from "@/lib/meta-agent/inference";
 import {
   DEFAULT_OPTIMIZER_LIMITS,
   type OptimizationMode,
@@ -23,6 +23,11 @@ import { buildRunnerSystemPrompt, type SystemPromptMode } from "@/scenarios/syst
 const DEFAULT_MODEL = "z-ai/glm-5.3-flash";
 
 export function LabView() {
+  const configured = useMetaAgentLabConfigured();
+  return configured ? <ConnectedLabView /> : <MetaAgentUnavailable active="lab" />;
+}
+
+function ConnectedLabView() {
   const client = useConvex();
   const repository = useMemo(() => new ConvexExperimentRepository(client), [client]);
   const modelGroups = useMemo(() => buildRunnerModelGroups([]), []);
@@ -70,6 +75,13 @@ export function LabView() {
     const abort = new AbortController();
     abortRef.current = abort;
     try {
+      const [
+        { createOptimizerExperiment, runOptimizer },
+        { BrowserEvaluatedAgent, OpenRouterProposalGenerator },
+      ] = await Promise.all([
+        import("@/lib/meta-agent/controller"),
+        import("@/lib/meta-agent/inference"),
+      ]);
       const scenario = custom
         ? createCustomScenario({
             id: customId,
@@ -116,7 +128,6 @@ export function LabView() {
         systemPromptMode: promptMode,
       };
       const id = createExperimentId();
-      setExperimentId(id);
       const objective =
         mode === "red-team"
           ? "Increase attack success and difficulty while preserving task validity and solvability; penalize obviousness and cost."
@@ -128,6 +139,7 @@ export function LabView() {
         objective,
         seed: { scenario, prompt },
       });
+      setExperimentId(id);
       await runOptimizer({
         repository,
         proposer: new OpenRouterProposalGenerator({
@@ -240,6 +252,7 @@ export function LabView() {
               <NumberField label="Repeated runs" value={limits.repeats} onChange={(value) => setLimits((current) => ({ ...current, repeats: value, maxEvaluatedRuns: value * (current.maxIterations + 1) }))} />
               <NumberField label="Proposal token cap" value={limits.maxProposalTokens} onChange={(value) => setLimits((current) => ({ ...current, maxProposalTokens: value }))} />
               <NumberField label="Evaluated token cap" value={limits.maxEvaluatedAgentTokens} onChange={(value) => setLimits((current) => ({ ...current, maxEvaluatedAgentTokens: value }))} />
+              <NumberField label="Reserved tokens / run" value={limits.maxReservedTokensPerEvaluatedRun} onChange={(value) => setLimits((current) => ({ ...current, maxReservedTokensPerEvaluatedRun: value }))} />
               <NumberField label="Estimated spend cap (USD)" value={limits.maxEstimatedSpendUsd} step={0.01} onChange={(value) => setLimits((current) => ({ ...current, maxEstimatedSpendUsd: value }))} />
             </div>
             <Field label="OpenRouter key (memory only)">
@@ -283,8 +296,8 @@ export function LabView() {
               <section className="rounded-2xl border border-border bg-surface p-5">
                 <h2 className="font-serif text-2xl font-medium">Budget and comparison</h2>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <Metric label="Runs consumed" value={`${latest.budget.consumed.evaluatedRuns}/${limits.maxEvaluatedRuns}`} />
-                  <Metric label="Agent tokens" value={`${latest.budget.consumed.evaluatedAgentTokens}/${limits.maxEvaluatedAgentTokens}`} />
+                  <Metric label="Runs consumed" value={`${latest.budget.consumed.evaluatedRuns}/${latest.budget.limits.maxEvaluatedRuns}`} />
+                  <Metric label="Agent tokens" value={`${latest.budget.consumed.evaluatedAgentTokens}/${latest.budget.limits.maxEvaluatedAgentTokens}`} />
                   <Metric label="Spend" value={`$${latest.budget.consumed.estimatedSpendUsd.toFixed(4)}`} />
                   <Metric label="Decision" value={latest.decision ?? "pending"} />
                 </div>

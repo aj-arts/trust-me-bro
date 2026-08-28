@@ -8,6 +8,16 @@ export const ARTIFACT_MAX_BYTES = 4 * 1024 * 1024;
 export const ARTIFACT_MAX_CHUNKS = 96;
 export const REVISION_MAX_BYTES = 512 * 1024;
 
+export function assertMetaAgentLabEnabled(
+  enabled = process.env.META_AGENT_LAB_LOCAL_ONLY === "true",
+) {
+  if (!enabled) {
+    throw new Error(
+      "Meta-agent persistence is disabled unless META_AGENT_LAB_LOCAL_ONLY=true in a trusted single-user deployment.",
+    );
+  }
+}
+
 export type ExperimentStatus = "draft" | "running" | "completed" | "failed" | "cancelled";
 export type CandidateStatus = "proposed" | "accepted" | "rejected";
 export type StoredRunStatus = "running" | "completed" | "failed";
@@ -190,6 +200,46 @@ export function assertCandidateTransition(from: CandidateStatus, to: CandidateSt
 export function assertRunTransition(from: StoredRunStatus, to: StoredRunStatus) {
   if (from !== "running" || (to !== "completed" && to !== "failed")) {
     throw new Error(`Invalid run transition: ${from} -> ${to}.`);
+  }
+}
+
+export function assertComparableStoredRun(run: {
+  status?: StoredRunStatus;
+  artifactChunkCount?: number;
+}) {
+  if (run.status !== "completed" || !run.artifactChunkCount) {
+    throw new Error("Only successfully finalized runs can be compared.");
+  }
+}
+
+export function shouldAssignBaseline(existingStatus?: StoredRunStatus) {
+  return existingStatus !== "completed";
+}
+
+export function assertStoredArtifactMatchesRun(input: {
+  artifact: RunArtifact;
+  artifactJson: string;
+  runId: string;
+  model: string;
+  scenarioRevisionId: string;
+  scenarioSnapshotJson: string;
+  promptSystemPrompt: unknown;
+}) {
+  if (
+    input.artifact.runId !== input.runId ||
+    input.artifact.model !== input.model ||
+    input.artifact.scenario.revisionId !== input.scenarioRevisionId
+  ) {
+    throw new Error("Run artifact identity does not match its run record.");
+  }
+  if (input.scenarioSnapshotJson !== stableStringify(input.artifact.scenario)) {
+    throw new Error("Run artifact scenario does not match its scenario revision.");
+  }
+  if (input.promptSystemPrompt !== input.artifact.effectiveSystemPrompt) {
+    throw new Error("Run artifact prompt does not match its prompt revision.");
+  }
+  if (stableStringify(redactForPersistence(input.artifact)) !== input.artifactJson) {
+    throw new Error("Run artifact was not sanitized at the persistence boundary.");
   }
 }
 

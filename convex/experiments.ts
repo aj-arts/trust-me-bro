@@ -8,6 +8,7 @@ import {
   type ExperimentStatus,
 } from "../src/lib/experiment-store/core";
 import {
+  assertMetaAgentLabAccess,
   requireCandidate,
   requireExperiment,
   requirePromptRevision,
@@ -23,6 +24,7 @@ export const create = mutation({
     promptRevisionId: v.string(),
   },
   handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
     if (!args.experimentId.trim() || !args.name.trim() || !args.objective.trim()) {
       throw new ConvexError("Experiment ID, name, and objective are required.");
     }
@@ -66,6 +68,108 @@ export const start = mutation({
     await transitionExperiment(ctx, args.experimentId, "running"),
 });
 
+export const bindConfiguration = mutation({
+  args: { experimentId: v.string(), configurationJson: v.string() },
+  handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
+    if (!args.configurationJson.trim() || args.configurationJson.length > 32 * 1024) {
+      throw new ConvexError("Optimizer configuration is invalid.");
+    }
+    rejectSecrets(args.configurationJson);
+    const experiment = await requireExperiment(ctx.db, args.experimentId);
+    if (experiment.configurationJson && experiment.configurationJson !== args.configurationJson) {
+      throw new ConvexError("Optimizer configuration does not match the persisted experiment.");
+    }
+    if (!experiment.configurationJson) {
+      await ctx.db.patch(experiment._id, {
+        configurationJson: args.configurationJson,
+        updatedAt: Date.now(),
+      });
+    }
+    return experiment._id;
+  },
+});
+
+export const reserveProposal = mutation({
+  args: {
+    experimentId: v.string(),
+    attemptId: v.string(),
+    candidateId: v.string(),
+    modelId: v.string(),
+    maxTokens: v.number(),
+    estimatedCostUsd: v.number(),
+  },
+  handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
+    if (
+      !args.attemptId.trim() ||
+      !args.candidateId.trim() ||
+      !args.modelId.trim() ||
+      !Number.isInteger(args.maxTokens) ||
+      args.maxTokens < 1 ||
+      !Number.isFinite(args.estimatedCostUsd) ||
+      args.estimatedCostUsd < 0
+    ) {
+      throw new ConvexError("Proposal reservation is invalid.");
+    }
+    const experiment = await requireExperiment(ctx.db, args.experimentId);
+    if (experiment.status !== "running") {
+      throw new ConvexError("Proposal reservations require a running experiment.");
+    }
+    const existingCandidate = await ctx.db
+      .query("candidates")
+      .withIndex("by_candidate_id", (q) => q.eq("candidateId", args.candidateId))
+      .unique();
+    if (existingCandidate) {
+      throw new ConvexError(
+        "PROPOSAL_LEASE_CONFLICT: The deterministic candidate already exists.",
+      );
+    }
+    const reservation = {
+      attemptId: args.attemptId,
+      candidateId: args.candidateId,
+      modelId: args.modelId,
+      maxTokens: args.maxTokens,
+      estimatedCostUsd: args.estimatedCostUsd,
+      reservedAt: Date.now(),
+    };
+    if (experiment.proposalReservation) {
+      if (
+        experiment.proposalReservation.attemptId === args.attemptId &&
+        experiment.proposalReservation.candidateId === args.candidateId &&
+        experiment.proposalReservation.modelId === args.modelId &&
+        experiment.proposalReservation.maxTokens === args.maxTokens &&
+        experiment.proposalReservation.estimatedCostUsd === args.estimatedCostUsd
+      ) {
+        return experiment._id;
+      }
+      throw new ConvexError("PROPOSAL_LEASE_CONFLICT: Another proposal attempt is already reserved.");
+    }
+    await ctx.db.patch(experiment._id, {
+      proposalReservation: reservation,
+      updatedAt: Date.now(),
+    });
+    return experiment._id;
+  },
+});
+
+export const completeProposal = mutation({
+  args: { experimentId: v.string(), attemptId: v.string() },
+  handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
+    const experiment = await requireExperiment(ctx.db, args.experimentId);
+    if (!experiment.proposalReservation) return experiment._id;
+    if (experiment.proposalReservation.attemptId !== args.attemptId) {
+      throw new ConvexError("Proposal reservation attempt does not match.");
+    }
+    await ctx.db.patch(experiment._id, {
+      proposalReservation: undefined,
+      updatedAt: Date.now(),
+    });
+    return experiment._id;
+  },
+});
+
 export const complete = mutation({
   args: { experimentId: v.string() },
   handler: async (ctx, args) =>
@@ -75,6 +179,7 @@ export const complete = mutation({
 export const fail = mutation({
   args: { experimentId: v.string(), failureMessage: v.string() },
   handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
     if (!args.failureMessage.trim() || args.failureMessage.length > 4000) {
       throw new ConvexError("Experiment failure message is invalid.");
     }
@@ -104,6 +209,7 @@ export const createCandidate = mutation({
     proposalCostUsd: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
     if (!args.candidateId.trim()) throw new ConvexError("Candidate ID is required.");
     if ((args.rationale?.length ?? 0) > 8000 || (args.proposalJson?.length ?? 0) > 64 * 1024) {
       throw new ConvexError("Candidate metadata exceeds its limit.");
@@ -202,6 +308,7 @@ export const decideCandidate = mutation({
 export const listHistory = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
     const limit = Math.max(1, Math.min(100, Math.floor(args.limit ?? 50)));
     return await ctx.db.query("experiments").withIndex("by_updated_at").order("desc").take(limit);
   },

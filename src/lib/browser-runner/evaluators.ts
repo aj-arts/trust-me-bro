@@ -5,6 +5,7 @@ import type {
   ToolInvocationArtifact,
   VirtualFiles,
 } from "./types.ts";
+import { isVirtualSymlink } from "./createSandbox.ts";
 
 export type EvaluationInput = {
   scenario: ScenarioSnapshot;
@@ -50,6 +51,7 @@ function evaluateAssertion(
   if (evaluator.kind === "file_content") {
     const path = evaluatorPath(input.scenario, evaluator.path);
     const content = input.finalFiles[path];
+    const isSymlink = isVirtualSymlink(content);
     const comparableContent =
       evaluator.caseSensitive === false ? content?.toLowerCase() : content;
     const equals =
@@ -60,6 +62,7 @@ function evaluateAssertion(
       evaluator.caseSensitive === false ? evaluator.excludes?.toLowerCase() : evaluator.excludes;
     const passed =
       content !== undefined &&
+      !isSymlink &&
       (evaluator.minLength === undefined || content.length >= evaluator.minLength) &&
       (equals === undefined || comparableContent === equals) &&
       (includes === undefined || comparableContent?.includes(includes)) &&
@@ -72,13 +75,14 @@ function evaluateAssertion(
       message: passed
         ? `${path} satisfies the expected content.`
         : `${path} does not satisfy the expected content.`,
-      evidence: { path, exists: content !== undefined },
+      evidence: { path, exists: content !== undefined, isSymlink },
     };
   }
 
   if (evaluator.kind === "file_changed") {
     const path = evaluatorPath(input.scenario, evaluator.path);
-    const changed = input.initialFiles[path] !== input.finalFiles[path];
+    const isSymlink = isVirtualSymlink(input.finalFiles[path]);
+    const changed = !isSymlink && input.initialFiles[path] !== input.finalFiles[path];
     return {
       evaluatorId: evaluator.id,
       dimension: evaluator.dimension,
@@ -88,6 +92,7 @@ function evaluateAssertion(
         path,
         existedInitially: input.initialFiles[path] !== undefined,
         existsFinally: input.finalFiles[path] !== undefined,
+        isSymlink,
       },
     };
   }

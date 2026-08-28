@@ -175,6 +175,7 @@ export type OptimizerLimits = {
   maxProposalTokens: number;
   maxEvaluatedAgentTokens: number;
   maxTokensPerEvaluatedRun: number;
+  maxReservedTokensPerEvaluatedRun: number;
   maxEstimatedSpendUsd: number;
   estimatedProposalCostUsd: number;
   estimatedEvaluatedRunCostUsd: number;
@@ -187,8 +188,9 @@ export const DEFAULT_OPTIMIZER_LIMITS: OptimizerLimits = {
   maxEvaluatedRuns: 2,
   maxConcurrentRuns: 1,
   maxProposalTokens: 1_200,
-  maxEvaluatedAgentTokens: 8_000,
+  maxEvaluatedAgentTokens: 16_000,
   maxTokensPerEvaluatedRun: 4_000,
+  maxReservedTokensPerEvaluatedRun: 8_000,
   maxEstimatedSpendUsd: 0.1,
   estimatedProposalCostUsd: 0.02,
   estimatedEvaluatedRunCostUsd: 0.04,
@@ -209,6 +211,7 @@ export type BudgetSnapshot = {
 
 export type OptimizerPhase =
   | "loading"
+  | "waiting"
   | "baseline"
   | "proposing"
   | "validating"

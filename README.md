@@ -106,10 +106,17 @@ adapters and make no live calls.
 
 Current limitations: a partially uploaded run is not replayed automatically because
 doing so could duplicate a billable provider call; the controller surfaces it as an
-explicit failure for operator inspection. Provider-reported token usage is authoritative
-after each call, while per-call output tokens are capped before dispatch. Convex access
-control follows the deployment's existing policy; public or multi-user deployments must
-add authenticated ownership checks before exposing write mutations.
+explicit failure for operator inspection. Provider-reported token usage is authoritative after each call. Each evaluated run
+reserves a separately configured total-token allowance before dispatch; the provider
+output cap is intentionally distinct so input tokens are not mistaken for free budget.
+
+Meta-agent revisions, experiments, and full run artifacts fail closed by default because
+the app does not yet have a product identity or ownership model. To use them in a trusted
+single-user local deployment, set `NEXT_PUBLIC_CONVEX_URL`, set
+`NEXT_PUBLIC_META_AGENT_LAB_LOCAL_ONLY=true` in the Next.js app, and set
+`META_AGENT_LAB_LOCAL_ONLY=true` in the matching Convex deployment. Never enable this
+mode for a public or multi-user deployment; authenticated ownership checks are required
+before doing so. Legacy aggregate dashboard reads and writes remain available.
 
 ## Experiment persistence
 
