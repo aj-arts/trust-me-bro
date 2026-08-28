@@ -27,6 +27,12 @@ import {
   normalizeOpenRouterApiKey,
   openRouterModelCapabilities,
 } from "../openrouter-capabilities.ts";
+import {
+  DEFAULT_LAB_MODE,
+  DEFAULT_LAB_SCENARIO_ID,
+  findDefaultLabScenario,
+} from "../lab-defaults.ts";
+import { scenarios } from "../../scenarios/registry.ts";
 
 function seedScenario() {
   return createScenarioSnapshot({
@@ -115,6 +121,16 @@ test("proposal parsing is strict and reports actionable paths", () => {
       error instanceof ProposalValidationError &&
       error.issues.some((issue) => issue.path === "$.shell" && issue.code === "unknown_field"),
   );
+});
+
+test("lab defaults resolve by stable scenario ID", () => {
+  assert.equal(DEFAULT_LAB_MODE, "red-team");
+  assert.equal(DEFAULT_LAB_SCENARIO_ID, "poisoned-skill-curl-bash");
+  assert.equal(
+    findDefaultLabScenario([...scenarios].reverse())?.id,
+    DEFAULT_LAB_SCENARIO_ID,
+  );
+  assert.equal(findDefaultLabScenario([]), undefined);
 });
 
 test("proposal validation rejects path traversal and wrong mutation surfaces", () => {
@@ -557,11 +573,15 @@ test("proposal generator binds only the default host fetch", async () => {
 });
 
 test("budget enforcement stops before reserved work crosses a limit", () => {
-  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxProposalTokens, 131_072);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxIterations, 3);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxCandidates, 3);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.repeats, 1);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEvaluatedRuns, 4);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxProposalTokens, 393_216);
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxTokensPerProposal, 131_072);
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxTokensPerEvaluatedRun, 131_072);
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxReservedTokensPerEvaluatedRun, 1_048_576);
-  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEvaluatedAgentTokens, 2_097_152);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEvaluatedAgentTokens, 4_194_304);
   assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEstimatedSpendUsd, 25);
   assert.deepEqual(openRouterModelCapabilities("z-ai/glm-5.3-flash"), {
     contextLength: 1_048_576,
@@ -978,6 +998,8 @@ test("repeats and a holdout model remain sequential and budgeted", async () => {
       ...configuration(experimentId),
       limits: {
         ...DEFAULT_OPTIMIZER_LIMITS,
+        maxIterations: 1,
+        maxCandidates: 1,
         repeats: 2,
         maxEvaluatedRuns: 8,
         maxEvaluatedAgentTokens: 64_000,
@@ -1376,7 +1398,15 @@ function configuration(experimentId) {
     objective: "Increase attack success while preserving task success.",
     proposalModelId: "fake/proposer",
     evaluatedModelId: "fake/evaluated",
-    limits: DEFAULT_OPTIMIZER_LIMITS,
+    limits: {
+      ...DEFAULT_OPTIMIZER_LIMITS,
+      maxIterations: 1,
+      maxCandidates: 1,
+      maxEvaluatedRuns: 2,
+      maxProposalTokens: DEFAULT_OPTIMIZER_LIMITS.maxTokensPerProposal,
+      maxEvaluatedAgentTokens:
+        2 * DEFAULT_OPTIMIZER_LIMITS.maxReservedTokensPerEvaluatedRun,
+    },
   };
 }
 

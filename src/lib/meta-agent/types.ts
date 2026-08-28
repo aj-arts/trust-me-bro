@@ -223,14 +223,14 @@ export type OptimizerLimits = {
 };
 
 export const DEFAULT_OPTIMIZER_LIMITS: OptimizerLimits = {
-  maxIterations: 1,
-  maxCandidates: 1,
+  maxIterations: 3,
+  maxCandidates: 3,
   repeats: 1,
-  maxEvaluatedRuns: 2,
+  maxEvaluatedRuns: 4,
   maxConcurrentRuns: 1,
-  maxProposalTokens: 131_072,
+  maxProposalTokens: 393_216,
   maxTokensPerProposal: 131_072,
-  maxEvaluatedAgentTokens: 2_097_152,
+  maxEvaluatedAgentTokens: 4_194_304,
   maxTokensPerEvaluatedRun: 131_072,
   maxReservedTokensPerEvaluatedRun: 1_048_576,
   maxEstimatedSpendUsd: 25,

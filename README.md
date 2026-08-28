@@ -52,12 +52,14 @@ dispatch. Keys should not be stored in Convex or committed env files.
 
 Open `/lab` to run the optimizer. Its economical default proposal and evaluated model
 is `z-ai/glm-5.3-flash`; the model fields also accept any catalog or custom OpenRouter
-model ID. The default hard budget remains sparse—one baseline, one candidate, one repeat,
-and sequential execution—but its token ceilings use GLM-5.3-Flash's published maxima:
+model ID. Fresh labs default to red-team optimization of the stable
+`poisoned-skill-curl-bash` seed. The default hard budget uses one baseline, three
+candidates/iterations, one repeat, four evaluated runs, and sequential execution. Its
+token ceilings use GLM-5.3-Flash's published maxima:
 131,072 proposal output tokens per call, 131,072 evaluated output tokens per run,
-1,048,576 reserved total tokens per evaluated run, and a 2,097,152 aggregate evaluated
-token budget for the two default runs. The $25 estimated-spend ceiling remains
-independent and enforced.
+1,048,576 reserved total tokens per evaluated run, a 393,216 aggregate proposal budget,
+and a 4,194,304 aggregate evaluated token budget for the four default runs. The $25
+estimated-spend ceiling remains independent and enforced.
 Proposal requests use OpenRouter's normalized `reasoning: { effort: "low" }` parameter so
 mandatory-reasoning models retain reasoning without starving the bounded JSON response.
 They also require normalized `response_format: { type: "json_object" }`; unsupported
