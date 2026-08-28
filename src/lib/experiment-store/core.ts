@@ -9,13 +9,20 @@ export const ARTIFACT_MAX_CHUNKS = 96;
 export const REVISION_MAX_BYTES = 512 * 1024;
 
 export function assertMetaAgentLabEnabled(
-  enabled = process.env.META_AGENT_LAB_LOCAL_ONLY === "true",
+  enabled = runtimeEnvironment().META_AGENT_LAB_LOCAL_ONLY === "true",
 ) {
   if (!enabled) {
     throw new Error(
       "Meta-agent persistence is disabled unless META_AGENT_LAB_LOCAL_ONLY=true in a trusted single-user deployment.",
     );
   }
+}
+
+function runtimeEnvironment(): Record<string, string | undefined> {
+  const runtime = globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  };
+  return runtime.process?.env ?? {};
 }
 
 export type ExperimentStatus = "draft" | "running" | "completed" | "failed" | "cancelled";

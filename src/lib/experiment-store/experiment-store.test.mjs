@@ -298,4 +298,15 @@ test("repository aborts a run whose artifact cannot fit bounded storage", async 
 test("meta-agent Convex access fails closed without explicit local-only opt-in", () => {
   assert.throws(() => assertMetaAgentLabEnabled(false), /disabled unless/);
   assert.doesNotThrow(() => assertMetaAgentLabEnabled(true));
+
+  const previous = process.env.META_AGENT_LAB_LOCAL_ONLY;
+  delete process.env.META_AGENT_LAB_LOCAL_ONLY;
+  try {
+    assert.throws(() => assertMetaAgentLabEnabled(), /disabled unless/);
+    process.env.META_AGENT_LAB_LOCAL_ONLY = "true";
+    assert.doesNotThrow(() => assertMetaAgentLabEnabled());
+  } finally {
+    if (previous === undefined) delete process.env.META_AGENT_LAB_LOCAL_ONLY;
+    else process.env.META_AGENT_LAB_LOCAL_ONLY = previous;
+  }
 });
