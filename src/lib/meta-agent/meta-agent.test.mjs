@@ -261,9 +261,37 @@ test("proposal generator binds only the default host fetch", async () => {
   });
   await injectedGenerator.generate(request);
   assert.equal(injectedCalledWithoutReceiver, true);
+
+  const truncatedGenerator = new OpenRouterProposalGenerator({
+    apiKey: "test-only-key",
+    modelId: "fake/reasoning-proposer",
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [
+          {
+            finish_reason: "length",
+            message: { content: null, reasoning: "provider reasoning must not be surfaced" },
+          },
+        ],
+        usage: { prompt_tokens: 1085, completion_tokens: 1200, cost: 0.001 },
+      }),
+    }),
+  });
+  await assert.rejects(
+    truncatedGenerator.generate({ ...request, maxTokens: 1200 }),
+    (error) =>
+      error instanceof Error &&
+      error.message.includes("1200-token cap") &&
+      error.message.includes("finish_reason: length") &&
+      error.message.includes("Increase the proposal token cap") &&
+      !error.message.includes("provider reasoning"),
+  );
 });
 
 test("budget enforcement stops before reserved work crosses a limit", () => {
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxProposalTokens, 4_096);
   const budget = new OptimizerBudget({
     ...DEFAULT_OPTIMIZER_LIMITS,
     maxEvaluatedRuns: 1,

@@ -58,9 +58,19 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
     if (!isRecord(payload) || !Array.isArray(payload.choices) || !isRecord(payload.choices[0])) {
       throw new Error("OpenRouter proposal response is missing choices.");
     }
-    const message = payload.choices[0].message;
+    const choice = payload.choices[0];
+    const message = choice.message;
     if (!isRecord(message) || typeof message.content !== "string" || !message.content.trim()) {
-      throw new Error("OpenRouter proposal response has no text content.");
+      const finishReason =
+        typeof choice.finish_reason === "string" ? choice.finish_reason : "unknown";
+      if (finishReason === "length") {
+        throw new Error(
+          `OpenRouter proposal response exhausted the ${request.maxTokens}-token cap before returning JSON (finish_reason: length). Increase the proposal token cap and retry.`,
+        );
+      }
+      throw new Error(
+        `OpenRouter proposal response has no text content (finish_reason: ${finishReason}).`,
+      );
     }
     const usage = isRecord(payload.usage) ? payload.usage : {};
     return {

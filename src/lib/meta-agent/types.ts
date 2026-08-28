@@ -187,7 +187,7 @@ export const DEFAULT_OPTIMIZER_LIMITS: OptimizerLimits = {
   repeats: 1,
   maxEvaluatedRuns: 2,
   maxConcurrentRuns: 1,
-  maxProposalTokens: 1_200,
+  maxProposalTokens: 4_096,
   maxEvaluatedAgentTokens: 16_000,
   maxTokensPerEvaluatedRun: 4_000,
   maxReservedTokensPerEvaluatedRun: 8_000,

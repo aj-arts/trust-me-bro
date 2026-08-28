@@ -51,9 +51,10 @@ User OpenRouter keys are entered in the browser runner UI. They should not be st
 Open `/lab` to run the optimizer. Its economical default proposal and evaluated model
 is `z-ai/glm-5.3-flash`; the model fields also accept any catalog or custom OpenRouter
 model ID. The default hard budget is deliberately sparse: one baseline, one candidate,
-one repeat, sequential execution, 1,200 proposal tokens, 8,000 evaluated-agent tokens,
-and a $0.10 estimated-spend ceiling. Increase these values only when intentionally
-opting into more iterations or repeated runs.
+one repeat, sequential execution, 4,096 proposal tokens, 16,000 evaluated-agent tokens,
+and a $0.10 estimated-spend ceiling. The proposal allowance leaves room for
+reasoning-capable models to return the required strict JSON object. Increase these values
+only when intentionally opting into more iterations or repeated runs.
 
 ## Optimizer modes and objective
 
