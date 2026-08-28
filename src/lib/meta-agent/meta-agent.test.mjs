@@ -450,12 +450,17 @@ test("proposal generator binds only the default host fetch", async () => {
       return Promise.resolve(response);
     },
   });
-  await injectedGenerator.generate(request);
+  const generated = await injectedGenerator.generate(request);
   assert.equal(injectedCalledWithoutReceiver, true);
   assert.equal(proposalRequestBody.model, "fake/proposer");
   assert.deepEqual(proposalRequestBody.reasoning, { effort: "low" });
+  assert.deepEqual(proposalRequestBody.response_format, { type: "json_object" });
   assert.equal(proposalRequestBody.max_tokens, request.maxTokens);
   assert.equal("include_reasoning" in proposalRequestBody, false);
+  assert.deepEqual(
+    parseStructuredProposal(generated.output).operations,
+    proposal().operations,
+  );
   const redInstructions = proposalInstructions;
   assert.ok(proposalInstructions.includes("Do not include budgetUsage"));
   for (const category of MUTATION_CATEGORIES_BY_MODE["red-team"]) {
@@ -505,6 +510,16 @@ test("proposal generator binds only the default host fetch", async () => {
       error.message.includes("finish_reason: length") &&
       error.message.includes("Increase the proposal token cap") &&
       !error.message.includes("provider reasoning"),
+  );
+
+  const unsupportedFormatGenerator = new OpenRouterProposalGenerator({
+    apiKey: "test-only-key",
+    modelId: "fake/no-json-format",
+    fetchImpl: async () => ({ ok: false, status: 400 }),
+  });
+  await assert.rejects(
+    unsupportedFormatGenerator.generate(request),
+    /HTTP 400 while requiring JSON-object output/,
   );
 });
 

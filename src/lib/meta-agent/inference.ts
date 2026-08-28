@@ -37,6 +37,7 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
         temperature: 0.2,
         max_tokens: request.maxTokens,
         reasoning: { effort: "low" },
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
@@ -54,7 +55,9 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
       }),
     });
     if (!response.ok) {
-      throw new Error(`OpenRouter proposal request failed with HTTP ${response.status}.`);
+      throw new Error(
+        `OpenRouter proposal request failed with HTTP ${response.status} while requiring JSON-object output.`,
+      );
     }
     const payload: unknown = await response.json();
     if (!isRecord(payload) || !Array.isArray(payload.choices) || !isRecord(payload.choices[0])) {

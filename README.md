@@ -57,6 +57,8 @@ reasoning-capable models to return the required strict JSON object. Increase the
 only when intentionally opting into more iterations or repeated runs.
 Proposal requests use OpenRouter's normalized `reasoning: { effort: "low" }` parameter so
 mandatory-reasoning models retain reasoning without starving the bounded JSON response.
+They also require normalized `response_format: { type: "json_object" }`; unsupported
+models fail explicitly rather than relaxing the raw-JSON parser or stripping markdown.
 
 Proposal schema version 1 accepts legacy model-supplied `budgetUsage` for compatibility,
 but does not trust it. The validator derives canonical operation count, unique files
