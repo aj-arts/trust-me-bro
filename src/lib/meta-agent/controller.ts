@@ -153,6 +153,8 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       configuration.limits.maxCandidates,
     );
     let lastDecision: "accepted" | "rejected" | undefined;
+    let lastProposal: StructuredProposal | undefined;
+    let lastValidationIssues: ProposalValidationError["issues"] | undefined;
     for (let iteration = 0; iteration < iterationLimit; iteration += 1) {
       abortIfRequested(input.signal);
       detail = await repository.loadExperiment(configuration.experimentId);
@@ -161,6 +163,14 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       const existing = detail.candidates.find((candidate) => candidate.candidateId === candidateId);
       if (existing?.validationIssuesJson) {
         const validationIssues = parseValidationIssues(existing.validationIssuesJson);
+        const persistedProposal = existing.proposalJson
+          ? parseStructuredProposal(existing.proposalJson)
+          : undefined;
+        lastProposal =
+          persistedProposal?.budgetUsage
+            ? { ...persistedProposal, budgetUsage: persistedProposal.budgetUsage }
+            : undefined;
+        lastValidationIssues = validationIssues;
         emit("deciding", iteration + 1, "Candidate rejected by mutation safety validation.", {
           candidateId,
           validationIssues,
@@ -181,6 +191,8 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
           limits: proposalLimits,
         });
         proposal = mutated.proposal;
+        lastProposal = proposal;
+        lastValidationIssues = undefined;
       } else {
         const candidateRunCount = expectedRunCount(configuration);
         budget.assertCanProposeAndRun(candidateRunCount);
@@ -244,9 +256,13 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
             decision: "rejected",
           });
           lastDecision = "rejected";
+          lastProposal = error.proposal;
+          lastValidationIssues = error.issues;
           continue;
         }
         proposal = mutated.proposal;
+        lastProposal = proposal;
+        lastValidationIssues = undefined;
         emit("validating", iteration + 1, "Validated proposal and derived canonical mutation metrics.", {
           candidateId,
           proposal,
@@ -353,6 +369,8 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
     return emit("completed", iterationLimit, "Optimization budget completed.", {
       baseline,
       decision: lastDecision,
+      proposal: lastProposal,
+      validationIssues: lastValidationIssues,
     });
   } catch (error) {
     if (error instanceof OptimizerLeaseConflictError) {

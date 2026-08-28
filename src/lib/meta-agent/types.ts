@@ -160,7 +160,7 @@ export const DEFAULT_PROPOSAL_LIMITS: ProposalLimits = {
 
 export const DEFAULT_BLUE_PROPOSAL_LIMITS: ProposalLimits = {
   ...DEFAULT_PROPOSAL_LIMITS,
-  maxEditRatio: 1,
+  maxEditRatio: 2,
 };
 
 export function proposalLimitsForMode(

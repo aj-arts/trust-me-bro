@@ -96,7 +96,7 @@ candidate run, validation enforces operation, file, byte, and edit-distance boun
 normalizes relative POSIX virtual paths; rejects traversal, absolute/home/host paths;
 keeps canaries and evaluators immutable; and permits only existing trusted runtime
 fixture identifiers. Red-team scenario edits retain a 40% subtlety ratio; blue-team
-prompt hardening permits up to a 100% edit ratio while retaining the absolute
+prompt hardening permits up to a 200% edit ratio while retaining the absolute
 4,000-character and 32 KiB prompt bounds. Immutable trusted seed fixture paths are
 grandfathered, but generated paths remain strict.
 
