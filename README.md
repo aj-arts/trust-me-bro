@@ -46,7 +46,9 @@ Run Convex in another terminal after configuring a Convex project:
 pnpm dev:convex
 ```
 
-User OpenRouter keys are entered in the browser runner UI. They should not be stored in Convex or committed env files.
+User OpenRouter keys are entered in the browser runner UI. Outer whitespace is trimmed;
+the supported `sk-or-v1-` plus 64-character format rejects internal whitespace before
+dispatch. Keys should not be stored in Convex or committed env files.
 
 Open `/lab` to run the optimizer. Its economical default proposal and evaluated model
 is `z-ai/glm-5.3-flash`; the model fields also accept any catalog or custom OpenRouter

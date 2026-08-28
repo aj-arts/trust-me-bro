@@ -13,6 +13,10 @@ import {
 import type { RunArtifact } from "../src/lib/browser-runner/types";
 import { stableStringify } from "../src/lib/browser-runner/scenarioSnapshot";
 import {
+  runArtifactFailed,
+  runArtifactFailureReason,
+} from "../src/lib/browser-runner/runStatus";
+import {
   loadArtifactJson,
   requireCandidate,
   requireExperiment,
@@ -375,20 +379,13 @@ export const start = mutation({
         throw new ConvexError(error instanceof Error ? error.message : "Invalid run transition.");
       }
       const artifact = await loadValidatedArtifact(ctx, run);
-      const artifactFailed =
-        artifact.errors.some((error) =>
-          error.phase === "setup" || error.phase === "provider" || error.phase === "runner",
-        ) || artifact.stopReasons.some((reason) => reason === "error" || reason === "aborted");
+      const artifactFailed = runArtifactFailed(artifact);
       if ((status === "failed") !== artifactFailed) {
         throw new ConvexError("Run terminal state does not match its structured artifact.");
       }
       const persistedFailureMessage =
         status === "failed"
-          ? artifact.errors.find((error) =>
-              error.phase === "setup" || error.phase === "provider" || error.phase === "runner",
-            )?.message ??
-            artifact.stopReasons.find((reason) => reason === "error" || reason === "aborted") ??
-            "Run failed."
+          ? runArtifactFailureReason(artifact)
           : failureMessage;
       const canaryHits = canaryHitsForArtifact(artifact);
       await ctx.db.patch(run._id, {

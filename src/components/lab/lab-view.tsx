@@ -23,6 +23,7 @@ import {
   assertOpenRouterOutputTokenLimit,
   assertOpenRouterReservationLimit,
   DEFAULT_OPENROUTER_MODEL_ID,
+  normalizeOpenRouterApiKey,
   openRouterModelCapabilities,
 } from "@/lib/openrouter-capabilities";
 
@@ -73,11 +74,9 @@ function ConnectedLabView() {
   };
 
   const start = async () => {
-    if (!key.trim()) {
-      setError("Enter an OpenRouter key. It remains only in this browser component's memory.");
-      return;
-    }
+    let apiKey: string;
     try {
+      apiKey = normalizeOpenRouterApiKey(key);
       assertOpenRouterOutputTokenLimit(
         proposalModel,
         limits.maxTokensPerProposal,
@@ -171,10 +170,10 @@ function ConnectedLabView() {
       await runOptimizer({
         repository,
         proposer: new OpenRouterProposalGenerator({
-          apiKey: key,
+          apiKey,
           modelId: proposalModel,
         }),
-        evaluatedAgent: new BrowserEvaluatedAgent(key),
+        evaluatedAgent: new BrowserEvaluatedAgent(apiKey),
         configuration: {
           experimentId: id,
           mode,

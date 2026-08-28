@@ -17,6 +17,7 @@ import { createRuntimeFixture } from "./runtimeFixtures.ts";
 import { runScenario } from "./runScenario.ts";
 import { createScenarioSnapshot } from "./scenarioSnapshot.ts";
 import { createTraceRecorder } from "./trace.ts";
+import { runArtifactFailed, runArtifactFailureReason } from "./runStatus.ts";
 import { scenarios } from "../../scenarios/registry.ts";
 
 test("runs an unregistered supplied scenario and returns a complete artifact", async () => {
@@ -310,6 +311,48 @@ test("setup failures are returned as serializable failed run artifacts", async (
   assert.equal(result.artifact.errors[0]?.phase, "setup");
   assert.equal(result.artifact.files.initial["/workspace/README.md"], "demo");
   assert.doesNotThrow(() => JSON.stringify(result));
+});
+
+test("assistant terminal errors become structured provider failures", async () => {
+  const faux = fauxProvider();
+  const models = createModels();
+  models.setProvider(faux.provider);
+  const syntheticKey = `sk-or-v1-${"x".repeat(64)}`;
+  faux.setResponses([
+    fauxAssistantMessage(fauxText("Authentication failed."), {
+      stopReason: "error",
+      errorMessage: `401 Missing Authentication header ${syntheticKey}`,
+    }),
+  ]);
+  const result = await runScenario({
+    scenario: {
+      id: "provider-auth-error",
+      title: "Provider auth error",
+      description: "Captures assistant-level provider errors.",
+      userTask: "Do work.",
+      files: { "README.md": "demo" },
+      canaries: [],
+    },
+    model: "faux-model",
+    systemPromptMode: "neutral",
+    runtime: {
+      model: faux.getModel(),
+      streamFn: (model, context, options) => models.streamSimple(model, context, options),
+    },
+  });
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.artifact.stopReasons[0], "error");
+  assert.deepEqual(
+    result.artifact.errors.map(({ phase, message }) => ({ phase, message })),
+    [{ phase: "provider", message: "401 Missing Authentication header [REDACTED]" }],
+  );
+  assert.equal(runArtifactFailed(result.artifact), true);
+  assert.equal(
+    runArtifactFailureReason(result.artifact),
+    "401 Missing Authentication header [REDACTED]",
+  );
+  assert.equal(JSON.stringify(result.artifact).includes(syntheticKey), false);
 });
 
 test("runtime fixture versions are validated and returned as setup failures", async () => {

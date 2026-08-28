@@ -35,6 +35,7 @@ import {
   useConvexConfigured,
   useMetaAgentLabConfigured,
 } from "@/components/providers/convex-client-provider";
+import { normalizeOpenRouterApiKey } from "@/lib/openrouter-capabilities";
 import { buildRunnerModelGroups } from "@/lib/model-catalog";
 import {
   buildRunnerSystemPrompt,
@@ -119,6 +120,7 @@ function RunnerViewShell({
   savedModelIds,
 }: RunnerViewShellProps) {
   const [openRouterKey, setOpenRouterKey] = useState("");
+  const [credentialError, setCredentialError] = useState<string>();
   const [model, setModel] = useState("openrouter/free");
   const [systemPromptMode, setSystemPromptMode] = useState(DEFAULT_SYSTEM_PROMPT_MODE);
   const [runSystemPromptMode, setRunSystemPromptMode] = useState(DEFAULT_SYSTEM_PROMPT_MODE);
@@ -185,7 +187,15 @@ function RunnerViewShell({
   }, [selectedFile, systemPromptFile.path]);
 
   async function handleStartRun() {
-    if (!openRouterKey.trim() || runState === "running") {
+    if (runState === "running") {
+      return;
+    }
+    let apiKey: string;
+    try {
+      apiKey = normalizeOpenRouterApiKey(openRouterKey);
+      setCredentialError(undefined);
+    } catch (error) {
+      setCredentialError(error instanceof Error ? error.message : "OpenRouter key is invalid.");
       return;
     }
 
@@ -202,7 +212,7 @@ function RunnerViewShell({
 
       const result = await runScenario({
         scenario,
-        openRouterKey,
+        openRouterKey: apiKey,
         model,
         systemPromptMode,
         onTrace: (event) => {
@@ -297,11 +307,17 @@ function RunnerViewShell({
               <input
                 id="openrouter-key"
                 value={openRouterKey}
-                onChange={(event) => setOpenRouterKey(event.target.value)}
+                onChange={(event) => {
+                  setOpenRouterKey(event.target.value);
+                  setCredentialError(undefined);
+                }}
                 type="password"
                 placeholder="sk-or-..."
                 className="mt-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
               />
+              {credentialError ? (
+                <p role="alert" className="mt-2 text-xs text-danger">{credentialError}</p>
+              ) : null}
 
               <label className="mt-4 block text-sm font-medium" htmlFor="model">
                 Model

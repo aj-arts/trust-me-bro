@@ -9,6 +9,7 @@ import type {
 import { MUTATION_CATEGORIES_BY_MODE } from "./types.ts";
 import {
   assertOpenRouterOutputTokenLimit,
+  normalizeOpenRouterApiKey,
   openRouterModelCapabilities,
 } from "../openrouter-capabilities.ts";
 
@@ -20,9 +21,8 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
   private readonly fetchImpl: typeof fetch;
 
   constructor(input: { apiKey: string; modelId: string; fetchImpl?: typeof fetch }) {
-    if (!input.apiKey.trim()) throw new Error("An in-memory OpenRouter key is required.");
     if (!input.modelId.trim()) throw new Error("A proposal model ID is required.");
-    this.apiKey = input.apiKey;
+    this.apiKey = normalizeOpenRouterApiKey(input.apiKey);
     this.modelId = input.modelId;
     this.fetchImpl = input.fetchImpl ?? globalThis.fetch.bind(globalThis);
   }
@@ -97,8 +97,7 @@ export class BrowserEvaluatedAgent implements EvaluatedAgent {
   private readonly apiKey: string;
 
   constructor(apiKey: string) {
-    if (!apiKey.trim()) throw new Error("An in-memory OpenRouter key is required.");
-    this.apiKey = apiKey;
+    this.apiKey = normalizeOpenRouterApiKey(apiKey);
   }
 
   async run(request: EvaluatedAgentRequest) {

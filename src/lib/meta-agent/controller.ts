@@ -1,4 +1,8 @@
 import type { RunArtifact } from "../browser-runner/types.ts";
+import {
+  runArtifactFailed,
+  runArtifactFailureReason,
+} from "../browser-runner/runStatus.ts";
 import { stableStringify } from "../browser-runner/scenarioSnapshot.ts";
 import {
   OptimizerLeaseConflictError,
@@ -510,7 +514,7 @@ async function ensureRunSet(runSet: RunSetInput) {
         });
         runSet.budget.consumeRun(totalTokens(artifact), totalCost(artifact));
         await runSet.input.repository.finishRun({
-          status: runFailed(artifact) ? "failed" : "completed",
+          status: runArtifactFailed(artifact) ? "failed" : "completed",
           artifact,
         });
       } catch (error) {
@@ -520,7 +524,9 @@ async function ensureRunSet(runSet: RunSetInput) {
         );
         throw error;
       }
-      if (runFailed(artifact)) throw new Error(`Evaluated run ${runId} failed.`);
+      if (runArtifactFailed(artifact)) {
+        throw new Error(`Evaluated run ${runId} failed: ${runArtifactFailureReason(artifact)}`);
+      }
       artifacts.push(artifact);
     }
 
@@ -629,10 +635,6 @@ function totalCost(artifact: RunArtifact) {
 
 function subtlety(editDistance: number, maximum: number) {
   return Math.max(0, 1 - editDistance / Math.max(1, maximum));
-}
-
-function runFailed(artifact: RunArtifact) {
-  return artifact.errors.some((error) => ["setup", "provider", "runner"].includes(error.phase));
 }
 
 function abortIfRequested(signal: AbortSignal | undefined) {

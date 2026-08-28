@@ -24,6 +24,7 @@ import { bootstrapScriptAmbushScenario } from "../../scenarios/bootstrap-script-
 import { buildRunnerSystemPrompt } from "../../scenarios/system-prompts.ts";
 import {
   assertOpenRouterOutputTokenLimit,
+  normalizeOpenRouterApiKey,
   openRouterModelCapabilities,
 } from "../openrouter-capabilities.ts";
 
@@ -67,6 +68,7 @@ const prompt = {
   systemPrompt: "Complete the task safely.",
   systemPromptMode: "safe",
 };
+const TEST_OPENROUTER_KEY = `sk-or-v1-${"x".repeat(64)}`;
 
 function proposal(overrides = {}) {
   return {
@@ -431,7 +433,7 @@ test("proposal generator binds only the default host fetch", async () => {
       return Promise.resolve(response);
     };
     const defaultGenerator = new OpenRouterProposalGenerator({
-      apiKey: "test-only-key",
+      apiKey: TEST_OPENROUTER_KEY,
       modelId: "fake/proposer",
     });
     await defaultGenerator.generate(request);
@@ -444,7 +446,7 @@ test("proposal generator binds only the default host fetch", async () => {
   let proposalInstructions = "";
   let proposalRequestBody;
   const injectedGenerator = new OpenRouterProposalGenerator({
-    apiKey: "test-only-key",
+    apiKey: TEST_OPENROUTER_KEY,
     modelId: "fake/proposer",
     fetchImpl: function (_url, init) {
       injectedCalledWithoutReceiver = this === undefined;
@@ -490,7 +492,7 @@ test("proposal generator binds only the default host fetch", async () => {
   assert.ok(proposalInstructions.includes(`${DEFAULT_BLUE_PROPOSAL_LIMITS.maxEditRatio * 100}%`));
 
   const truncatedGenerator = new OpenRouterProposalGenerator({
-    apiKey: "test-only-key",
+    apiKey: TEST_OPENROUTER_KEY,
     modelId: "fake/reasoning-proposer",
     fetchImpl: async () => ({
       ok: true,
@@ -517,7 +519,7 @@ test("proposal generator binds only the default host fetch", async () => {
   );
 
   const unsupportedFormatGenerator = new OpenRouterProposalGenerator({
-    apiKey: "test-only-key",
+    apiKey: TEST_OPENROUTER_KEY,
     modelId: "fake/no-json-format",
     fetchImpl: async () => ({ ok: false, status: 400 }),
   });
@@ -528,7 +530,7 @@ test("proposal generator binds only the default host fetch", async () => {
 
   let impossibleRequestSent = false;
   const boundedGenerator = new OpenRouterProposalGenerator({
-    apiKey: "test-only-key",
+    apiKey: TEST_OPENROUTER_KEY,
     modelId: "z-ai/glm-5.3-flash",
     fetchImpl: async () => {
       impossibleRequestSent = true;
@@ -541,7 +543,7 @@ test("proposal generator binds only the default host fetch", async () => {
   );
   assert.equal(impossibleRequestSent, false);
 
-  const evaluatedAgent = new BrowserEvaluatedAgent("test-only-key");
+  const evaluatedAgent = new BrowserEvaluatedAgent(TEST_OPENROUTER_KEY);
   await assert.rejects(
     evaluatedAgent.run({
       runId: "invalid-evaluated-cap",
@@ -567,6 +569,18 @@ test("budget enforcement stops before reserved work crosses a limit", () => {
     source: "known",
   });
   assert.equal(openRouterModelCapabilities("custom/model").source, "fallback");
+  assert.equal(
+    normalizeOpenRouterApiKey(`  ${TEST_OPENROUTER_KEY}\n`),
+    TEST_OPENROUTER_KEY,
+  );
+  assert.throws(
+    () => normalizeOpenRouterApiKey(`${TEST_OPENROUTER_KEY.slice(0, 20)} ${TEST_OPENROUTER_KEY.slice(20)}`),
+    /internal whitespace/,
+  );
+  assert.throws(
+    () => normalizeOpenRouterApiKey("not-an-openrouter-key"),
+    /supported sk-or-v1- format/,
+  );
   assert.throws(
     () =>
       assertOpenRouterOutputTokenLimit(
@@ -1095,6 +1109,7 @@ test("failed and cancelled evaluated calls terminate their persisted runs", asyn
       objective: configuration(experimentId).objective,
       seed: { scenario: seedScenario(), prompt },
     });
+
     const result = runOptimizer({
       repository,
       proposer: new FakeProposer(() => proposal()),
@@ -1110,6 +1125,39 @@ test("failed and cancelled evaluated calls terminate their persisted runs", asyn
     const detail = await repository.loadExperiment(experimentId);
     assert.equal(detail.runs[0].status, "failed");
   }
+});
+
+test("stopReason error with empty artifact errors remains a failed evaluated run", async () => {
+  const repository = new MemoryRepository();
+  const experimentId = "stop-reason-error";
+  const createdSeed = await createOptimizerExperiment({
+    repository,
+    experimentId,
+    name: "Stop reason error",
+    objective: configuration(experimentId).objective,
+    seed: { scenario: seedScenario(), prompt },
+  });
+  await assert.rejects(
+    runOptimizer({
+      repository,
+      proposer: new FakeProposer(() => proposal()),
+      evaluatedAgent: {
+        run: async (request) =>
+          artifact({
+            runId: request.runId,
+            safety: "passed",
+            task: "passed",
+            stopReasons: ["error"],
+          }),
+      },
+      configuration: configuration(experimentId),
+      seed: createdSeed,
+    }),
+    /Provider run returned an error/,
+  );
+  const detail = await repository.loadExperiment(experimentId);
+  assert.equal(detail.runs[0].status, "failed");
+  assert.equal(detail.experiment.status, "failed");
 });
 
 test("truncated history and unresolved proposal reservations stop before inference", async () => {
@@ -1332,7 +1380,7 @@ function configuration(experimentId) {
   };
 }
 
-function artifact({ runId, safety, task, cost = 0.001 }) {
+function artifact({ runId, safety, task, cost = 0.001, stopReasons = ["stop"], errors = [] }) {
   return {
     schemaVersion: 1,
     runId,
@@ -1355,8 +1403,8 @@ function artifact({ runId, safety, task, cost = 0.001 }) {
         cost: { input: cost, output: 0, cacheRead: 0, cacheWrite: 0, total: cost },
       },
     ],
-    stopReasons: ["stop"],
-    errors: [],
+    stopReasons,
+    errors,
     files: {
       initial: { "/workspace/src/value.txt": "before" },
       final: { "/workspace/src/value.txt": task === "passed" ? "after" : "before" },

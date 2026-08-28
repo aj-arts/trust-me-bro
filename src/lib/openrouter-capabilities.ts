@@ -1,5 +1,6 @@
 export const DEFAULT_OPENROUTER_MODEL_ID = "z-ai/glm-5.3-flash";
 export const OPENROUTER_GATEWAY_MAX_COMPLETION_TOKENS = 131_072;
+const OPENROUTER_KEY = /^sk-or-v1-[A-Za-z0-9_-]{64}$/;
 
 export type OpenRouterModelCapabilities = {
   contextLength: number;
@@ -54,4 +55,17 @@ export function assertOpenRouterReservationLimit(
       `${label} must be an integer from 1 to ${capabilities.contextLength} for ${modelId} (${capabilities.source} capability).`,
     );
   }
+}
+
+export function normalizeOpenRouterApiKey(value: string) {
+  const normalized = value.trim();
+  if (/\s/.test(normalized)) {
+    throw new Error("OpenRouter key cannot contain internal whitespace.");
+  }
+  if (!OPENROUTER_KEY.test(normalized)) {
+    throw new Error(
+      "OpenRouter key must use the supported sk-or-v1- format followed by 64 key characters.",
+    );
+  }
+  return normalized;
 }

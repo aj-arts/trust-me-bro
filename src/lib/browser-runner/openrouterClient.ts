@@ -1,6 +1,7 @@
 import type { Model } from "@earendil-works/pi-ai";
 import {
   assertOpenRouterOutputTokenLimit,
+  normalizeOpenRouterApiKey,
   openRouterModelCapabilities,
 } from "../openrouter-capabilities.ts";
 
@@ -17,14 +18,12 @@ export type OpenRouterSession = {
 };
 
 export function createOpenRouterSession(config: OpenRouterSessionConfig): OpenRouterSession {
-  if (!config.apiKey.trim()) {
-    throw new Error("OpenRouter key is required.");
-  }
+  const apiKey = normalizeOpenRouterApiKey(config.apiKey);
 
   return {
     model: createOpenRouterModel(config.model, config.maxTokens),
     modelId: config.model,
-    getApiKey: (provider) => (provider === "openrouter" ? config.apiKey : undefined),
+    getApiKey: (provider) => (provider === "openrouter" ? apiKey : undefined),
   };
 }
 

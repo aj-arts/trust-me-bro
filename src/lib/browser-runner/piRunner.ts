@@ -143,6 +143,23 @@ export async function runPiAgent(input: PiRunnerInput): Promise<PiRunnerResult> 
   );
   const messages = agent.state.messages.filter(isStandardMessage);
   const assistantMessages = messages.filter((message) => message.role === "assistant");
+  for (const message of assistantMessages) {
+    if (
+      (message.stopReason === "error" || message.stopReason === "aborted") &&
+      message.errorMessage?.trim() &&
+      !errors.some(
+        (error) => error.phase === "provider" && error.message === message.errorMessage,
+      )
+    ) {
+      const providerError = errorArtifact(
+        new Error(message.errorMessage),
+        "provider",
+        now(),
+      );
+      errors.push(providerError);
+      input.trace.emit("error", providerError.message);
+    }
+  }
 
   return {
     transcript: messages.map(toRedactedJson),
@@ -407,10 +424,12 @@ function errorArtifact(
   phase: RunErrorArtifact["phase"],
   timestamp: number,
 ): RunErrorArtifact {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const redactedMessage = toRedactedJson(rawMessage);
   return {
     timestamp,
     phase,
-    message: error instanceof Error ? error.message : String(error),
+    message: typeof redactedMessage === "string" ? redactedMessage : "Run failed.",
     name: error instanceof Error ? error.name : undefined,
   };
 }
