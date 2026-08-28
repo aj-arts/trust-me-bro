@@ -128,7 +128,8 @@ test("runs an unregistered supplied scenario and returns a complete artifact", a
   assert.ok(result.artifact.providerRequests.length >= 1);
   assert.ok(!serializedRequests.includes("private"));
   assert.ok(!serializedRequests.includes("supersecret"));
-  assert.ok(serializedRequests.includes("[REDACTED]"));
+  assert.ok(!serializedRequests.toLowerCase().includes("authorization"));
+  assert.ok(!serializedRequests.toLowerCase().includes("apikey"));
 });
 
 test("hydrates, snapshots, and diffs the virtual filesystem deterministically", async () => {

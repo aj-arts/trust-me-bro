@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useDeckTheme } from "@/components/theme-provider";
 
 type FloatingNavProps = {
-  active: "dashboard" | "runner" | "vision";
+  active: "dashboard" | "runner" | "experiments" | "vision";
   runnerHref: string;
   dashboardHref?: string;
+  experimentsHref?: string;
   visionHref?: string;
   variant?: "floating" | "rail" | "inline";
   className?: string;
@@ -17,6 +18,7 @@ export function FloatingNav({
   active,
   runnerHref,
   dashboardHref = "/",
+  experimentsHref = "/experiments",
   visionHref = "/vision",
   variant = "floating",
   className,
@@ -54,6 +56,7 @@ export function FloatingNav({
           active={active}
           dashboardHref={dashboardHref}
           runnerHref={runnerHref}
+          experimentsHref={experimentsHref}
           visionHref={visionHref}
           itemClass={itemClass}
         />
@@ -75,6 +78,7 @@ export function FloatingNav({
               active={active}
               dashboardHref={dashboardHref}
               runnerHref={runnerHref}
+              experimentsHref={experimentsHref}
               visionHref={visionHref}
               itemClass={itemClass}
             />
@@ -96,6 +100,7 @@ export function FloatingNav({
           active={active}
           dashboardHref={dashboardHref}
           runnerHref={runnerHref}
+          experimentsHref={experimentsHref}
           visionHref={visionHref}
           itemClass={itemClass}
         />
@@ -110,9 +115,10 @@ export function FloatingNav({
 }
 
 type NavLinksProps = {
-  active: "dashboard" | "runner" | "vision";
+  active: "dashboard" | "runner" | "experiments" | "vision";
   dashboardHref: string;
   runnerHref: string;
+  experimentsHref: string;
   visionHref: string;
   itemClass: (isActive: boolean) => string;
 };
@@ -121,6 +127,7 @@ function NavLinks({
   active,
   dashboardHref,
   runnerHref,
+  experimentsHref,
   visionHref,
   itemClass,
 }: NavLinksProps) {
@@ -139,6 +146,13 @@ function NavLinks({
         className={itemClass(active === "runner")}
       >
         Live Runner
+      </Link>
+      <Link
+        href={experimentsHref}
+        aria-current={active === "experiments" ? "page" : undefined}
+        className={itemClass(active === "experiments")}
+      >
+        Experiments
       </Link>
       <Link
         href={visionHref}
