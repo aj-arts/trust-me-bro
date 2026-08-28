@@ -213,6 +213,7 @@ export type OptimizerLimits = {
   maxEvaluatedRuns: number;
   maxConcurrentRuns: 1;
   maxProposalTokens: number;
+  maxTokensPerProposal: number;
   maxEvaluatedAgentTokens: number;
   maxTokensPerEvaluatedRun: number;
   maxReservedTokensPerEvaluatedRun: number;
@@ -227,10 +228,11 @@ export const DEFAULT_OPTIMIZER_LIMITS: OptimizerLimits = {
   repeats: 1,
   maxEvaluatedRuns: 2,
   maxConcurrentRuns: 1,
-  maxProposalTokens: 4_096,
-  maxEvaluatedAgentTokens: 16_000,
-  maxTokensPerEvaluatedRun: 4_000,
-  maxReservedTokensPerEvaluatedRun: 8_000,
+  maxProposalTokens: 131_072,
+  maxTokensPerProposal: 131_072,
+  maxEvaluatedAgentTokens: 2_097_152,
+  maxTokensPerEvaluatedRun: 131_072,
+  maxReservedTokensPerEvaluatedRun: 1_048_576,
   maxEstimatedSpendUsd: 0.1,
   estimatedProposalCostUsd: 0.02,
   estimatedEvaluatedRunCostUsd: 0.04,

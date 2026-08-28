@@ -577,7 +577,7 @@ async function reconstructBudget(
     candidates: candidates.length,
     evaluatedRuns: artifacts.length + reservedRuns,
     proposalTokens: candidates.reduce(
-      (sum, candidate) => sum + (candidate.proposalTokens ?? configuration.limits.maxProposalTokens),
+      (sum, candidate) => sum + (candidate.proposalTokens ?? configuration.limits.maxTokensPerProposal),
       0,
     ),
     evaluatedAgentTokens:

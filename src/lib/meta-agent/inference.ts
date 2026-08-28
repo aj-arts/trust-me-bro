@@ -7,6 +7,10 @@ import type {
   ProposalResponse,
 } from "./types.ts";
 import { MUTATION_CATEGORIES_BY_MODE } from "./types.ts";
+import {
+  assertOpenRouterOutputTokenLimit,
+  openRouterModelCapabilities,
+} from "../openrouter-capabilities.ts";
 
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -24,6 +28,7 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
   }
 
   async generate(request: ProposalRequest): Promise<ProposalResponse> {
+    assertOpenRouterOutputTokenLimit(this.modelId, request.maxTokens, "Proposal output cap per call");
     const fetchImpl = this.fetchImpl;
     const response = await fetchImpl(OPENROUTER_ENDPOINT, {
       method: "POST",
@@ -55,8 +60,9 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
       }),
     });
     if (!response.ok) {
+      const maximum = openRouterModelCapabilities(this.modelId).maxCompletionTokens;
       throw new Error(
-        `OpenRouter proposal request failed with HTTP ${response.status} while requiring JSON-object output.`,
+        `OpenRouter proposal request failed with HTTP ${response.status}. Verify JSON-object support and max_tokens <= ${maximum} for ${this.modelId}.`,
       );
     }
     const payload: unknown = await response.json();
@@ -97,6 +103,11 @@ export class BrowserEvaluatedAgent implements EvaluatedAgent {
 
   async run(request: EvaluatedAgentRequest) {
     throwIfAborted(request.signal);
+    assertOpenRouterOutputTokenLimit(
+      request.modelId,
+      request.maxTokens,
+      "Evaluated output cap per run",
+    );
     const result = await runScenario({
       scenario: request.scenario,
       openRouterKey: this.apiKey,

@@ -19,8 +19,14 @@ import {
 import { buildRunnerModelGroups } from "@/lib/model-catalog";
 import { scenarios } from "@/scenarios/registry";
 import { buildRunnerSystemPrompt, type SystemPromptMode } from "@/scenarios/system-prompts";
+import {
+  assertOpenRouterOutputTokenLimit,
+  assertOpenRouterReservationLimit,
+  DEFAULT_OPENROUTER_MODEL_ID,
+  openRouterModelCapabilities,
+} from "@/lib/openrouter-capabilities";
 
-const DEFAULT_MODEL = "z-ai/glm-5.3-flash";
+const DEFAULT_MODEL = DEFAULT_OPENROUTER_MODEL_ID;
 
 export function LabView() {
   const configured = useMetaAgentLabConfigured();
@@ -56,6 +62,8 @@ function ConnectedLabView() {
   const [error, setError] = useState<string>();
   const [running, setRunning] = useState(false);
   const latest = events.at(-1);
+  const proposalCapabilities = openRouterModelCapabilities(proposalModel);
+  const evaluatedCapabilities = openRouterModelCapabilities(evaluatedModel);
   const runnerHref = `/run/${selectedScenario?.id ?? ""}`;
 
   const selectScenario = (id: string) => {
@@ -67,6 +75,26 @@ function ConnectedLabView() {
   const start = async () => {
     if (!key.trim()) {
       setError("Enter an OpenRouter key. It remains only in this browser component's memory.");
+      return;
+    }
+    try {
+      assertOpenRouterOutputTokenLimit(
+        proposalModel,
+        limits.maxTokensPerProposal,
+        "Proposal output cap per call",
+      );
+      assertOpenRouterOutputTokenLimit(
+        evaluatedModel,
+        limits.maxTokensPerEvaluatedRun,
+        "Evaluated output cap per run",
+      );
+      assertOpenRouterReservationLimit(
+        evaluatedModel,
+        limits.maxReservedTokensPerEvaluatedRun,
+        "Reserved total tokens per evaluated run",
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
     setRunning(true);
@@ -248,11 +276,13 @@ function ConnectedLabView() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Proposal model"><input list="lab-models" value={proposalModel} onChange={(event) => setProposalModel(event.target.value)} className={inputClass} /></Field>
               <Field label="Evaluated model"><input list="lab-models" value={evaluatedModel} onChange={(event) => setEvaluatedModel(event.target.value)} className={inputClass} /></Field>
-              <NumberField label="Iterations / candidates" value={limits.maxIterations} onChange={(value) => setLimits((current) => ({ ...current, maxIterations: value, maxCandidates: value, maxEvaluatedRuns: current.repeats * (value + 1) }))} />
+              <NumberField label="Iterations / candidates" value={limits.maxIterations} onChange={(value) => setLimits((current) => ({ ...current, maxIterations: value, maxCandidates: value, maxEvaluatedRuns: current.repeats * (value + 1), maxProposalTokens: current.maxTokensPerProposal * value }))} />
               <NumberField label="Repeated runs" value={limits.repeats} onChange={(value) => setLimits((current) => ({ ...current, repeats: value, maxEvaluatedRuns: value * (current.maxIterations + 1) }))} />
-              <NumberField label="Proposal token cap" value={limits.maxProposalTokens} onChange={(value) => setLimits((current) => ({ ...current, maxProposalTokens: value }))} />
-              <NumberField label="Evaluated token cap" value={limits.maxEvaluatedAgentTokens} onChange={(value) => setLimits((current) => ({ ...current, maxEvaluatedAgentTokens: value }))} />
-              <NumberField label="Reserved tokens / run" value={limits.maxReservedTokensPerEvaluatedRun} onChange={(value) => setLimits((current) => ({ ...current, maxReservedTokensPerEvaluatedRun: value }))} />
+              <NumberField label="Total proposal token budget" value={limits.maxProposalTokens} onChange={(value) => setLimits((current) => ({ ...current, maxProposalTokens: value }))} />
+              <NumberField label="Proposal output cap / call" value={limits.maxTokensPerProposal} max={proposalCapabilities.maxCompletionTokens} onChange={(value) => setLimits((current) => ({ ...current, maxTokensPerProposal: value }))} />
+              <NumberField label="Total evaluated token budget" value={limits.maxEvaluatedAgentTokens} onChange={(value) => setLimits((current) => ({ ...current, maxEvaluatedAgentTokens: value }))} />
+              <NumberField label="Evaluated output cap / run" value={limits.maxTokensPerEvaluatedRun} max={evaluatedCapabilities.maxCompletionTokens} onChange={(value) => setLimits((current) => ({ ...current, maxTokensPerEvaluatedRun: value }))} />
+              <NumberField label="Reserved total tokens / run" value={limits.maxReservedTokensPerEvaluatedRun} max={evaluatedCapabilities.contextLength} onChange={(value) => setLimits((current) => ({ ...current, maxReservedTokensPerEvaluatedRun: value }))} />
               <NumberField label="Estimated spend cap (USD)" value={limits.maxEstimatedSpendUsd} step={0.01} onChange={(value) => setLimits((current) => ({ ...current, maxEstimatedSpendUsd: value }))} />
             </div>
             <Field label="OpenRouter key (memory only)">
@@ -342,8 +372,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block"><span className="mb-2 block text-xs font-medium uppercase tracking-[0.08em] text-muted">{label}</span>{children}</label>;
 }
 
-function NumberField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (value: number) => void; step?: number }) {
-  return <Field label={label}><input type="number" min={step} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className={inputClass} /></Field>;
+function NumberField({ label, value, onChange, step = 1, max }: { label: string; value: number; onChange: (value: number) => void; step?: number; max?: number }) {
+  return <Field label={label}><input type="number" min={step} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className={inputClass} /></Field>;
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {

@@ -19,9 +19,13 @@ import {
 import { validateAndApplyProposal } from "./validation.ts";
 import { createCustomScenario } from "./authoring.ts";
 import { OptimizerLeaseConflictError } from "../experiment-store/repository.ts";
-import { OpenRouterProposalGenerator } from "./inference.ts";
+import { BrowserEvaluatedAgent, OpenRouterProposalGenerator } from "./inference.ts";
 import { bootstrapScriptAmbushScenario } from "../../scenarios/bootstrap-script-ambush.ts";
 import { buildRunnerSystemPrompt } from "../../scenarios/system-prompts.ts";
+import {
+  assertOpenRouterOutputTokenLimit,
+  openRouterModelCapabilities,
+} from "../openrouter-capabilities.ts";
 
 function seedScenario() {
   return createScenarioSnapshot({
@@ -519,16 +523,72 @@ test("proposal generator binds only the default host fetch", async () => {
   });
   await assert.rejects(
     unsupportedFormatGenerator.generate(request),
-    /HTTP 400 while requiring JSON-object output/,
+    /HTTP 400.*max_tokens <= 32768/,
+  );
+
+  let impossibleRequestSent = false;
+  const boundedGenerator = new OpenRouterProposalGenerator({
+    apiKey: "test-only-key",
+    modelId: "z-ai/glm-5.3-flash",
+    fetchImpl: async () => {
+      impossibleRequestSent = true;
+      return response;
+    },
+  });
+  await assert.rejects(
+    boundedGenerator.generate({ ...request, maxTokens: 131_073 }),
+    /1 to 131072/,
+  );
+  assert.equal(impossibleRequestSent, false);
+
+  const evaluatedAgent = new BrowserEvaluatedAgent("test-only-key");
+  await assert.rejects(
+    evaluatedAgent.run({
+      runId: "invalid-evaluated-cap",
+      scenario: seedScenario(),
+      prompt,
+      modelId: "z-ai/glm-5.3-flash",
+      maxTokens: 131_073,
+    }),
+    /Evaluated output cap per run must be an integer from 1 to 131072/,
   );
 });
 
 test("budget enforcement stops before reserved work crosses a limit", () => {
-  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxProposalTokens, 4_096);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxProposalTokens, 131_072);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxTokensPerProposal, 131_072);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxTokensPerEvaluatedRun, 131_072);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxReservedTokensPerEvaluatedRun, 1_048_576);
+  assert.equal(DEFAULT_OPTIMIZER_LIMITS.maxEvaluatedAgentTokens, 2_097_152);
+  assert.deepEqual(openRouterModelCapabilities("z-ai/glm-5.3-flash"), {
+    contextLength: 1_048_576,
+    maxCompletionTokens: 131_072,
+    source: "known",
+  });
+  assert.equal(openRouterModelCapabilities("custom/model").source, "fallback");
+  assert.throws(
+    () =>
+      assertOpenRouterOutputTokenLimit(
+        "z-ai/glm-5.3-flash",
+        131_073,
+        "Proposal output cap per call",
+      ),
+    /1 to 131072/,
+  );
+  const proposalBudget = new OptimizerBudget({
+    ...DEFAULT_OPTIMIZER_LIMITS,
+    maxIterations: 2,
+    maxCandidates: 2,
+    maxProposalTokens: 200_000,
+  });
+  assert.equal(proposalBudget.proposalTokenAllowance(), 131_072);
+  proposalBudget.consumeProposal(100_000, 0);
+  assert.equal(proposalBudget.proposalTokenAllowance(), 100_000);
   const budget = new OptimizerBudget({
     ...DEFAULT_OPTIMIZER_LIMITS,
     maxEvaluatedRuns: 1,
     maxEvaluatedAgentTokens: 4_000,
+    maxTokensPerEvaluatedRun: 4_000,
     maxReservedTokensPerEvaluatedRun: 4_000,
   });
   budget.assertCanRun();
@@ -854,6 +914,8 @@ test("blue-team rejection keeps accepted lineage for a later iteration", async (
         maxEvaluatedRuns: 3,
         maxProposalTokens: 100,
         maxEvaluatedAgentTokens: 24_000,
+        maxTokensPerEvaluatedRun: 4_000,
+        maxReservedTokensPerEvaluatedRun: 4_000,
         maxEstimatedSpendUsd: 0.5,
       },
       proposalLimits: {
@@ -904,6 +966,8 @@ test("repeats and a holdout model remain sequential and budgeted", async () => {
         repeats: 2,
         maxEvaluatedRuns: 8,
         maxEvaluatedAgentTokens: 64_000,
+        maxTokensPerEvaluatedRun: 4_000,
+        maxReservedTokensPerEvaluatedRun: 4_000,
         maxEstimatedSpendUsd: 0.5,
       },
       holdout: { evaluatedModelId: "fake/holdout" },
@@ -1004,6 +1068,8 @@ test("candidate run sets are preflighted before paid proposal inference", async 
           repeats: 2,
           maxEvaluatedRuns: 3,
           maxEvaluatedAgentTokens: 32_000,
+          maxTokensPerEvaluatedRun: 4_000,
+          maxReservedTokensPerEvaluatedRun: 4_000,
         },
       },
       seed: createdSeed,

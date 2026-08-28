@@ -50,15 +50,19 @@ User OpenRouter keys are entered in the browser runner UI. They should not be st
 
 Open `/lab` to run the optimizer. Its economical default proposal and evaluated model
 is `z-ai/glm-5.3-flash`; the model fields also accept any catalog or custom OpenRouter
-model ID. The default hard budget is deliberately sparse: one baseline, one candidate,
-one repeat, sequential execution, 4,096 proposal tokens, 16,000 evaluated-agent tokens,
-and a $0.10 estimated-spend ceiling. The proposal allowance leaves room for
-reasoning-capable models to return the required strict JSON object. Increase these values
-only when intentionally opting into more iterations or repeated runs.
+model ID. The default hard budget remains sparse—one baseline, one candidate, one repeat,
+and sequential execution—but its token ceilings use GLM-5.3-Flash's published maxima:
+131,072 proposal output tokens per call, 131,072 evaluated output tokens per run,
+1,048,576 reserved total tokens per evaluated run, and a 2,097,152 aggregate evaluated
+token budget for the two default runs. The $0.10 estimated-spend ceiling remains
+independent and enforced.
 Proposal requests use OpenRouter's normalized `reasoning: { effort: "low" }` parameter so
 mandatory-reasoning models retain reasoning without starving the bounded JSON response.
 They also require normalized `response_format: { type: "json_object" }`; unsupported
 models fail explicitly rather than relaxing the raw-JSON parser or stripping markdown.
+Known model capabilities are validated before dispatch. Custom model IDs use a clearly
+reported conservative fallback (32,768 completion / 128,000 context tokens); impossible
+values are rejected rather than silently clamped.
 
 Proposal schema version 1 accepts legacy model-supplied `budgetUsage` for compatibility,
 but does not trust it. The validator derives canonical operation count, unique files

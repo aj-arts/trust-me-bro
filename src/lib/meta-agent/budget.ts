@@ -53,7 +53,10 @@ export class OptimizerBudget {
 
   proposalTokenAllowance() {
     this.assertCanPropose();
-    return Math.floor(this.snapshot().remaining.proposalTokens);
+    return Math.min(
+      this.limits.maxTokensPerProposal,
+      Math.floor(this.snapshot().remaining.proposalTokens),
+    );
   }
 
   consumeProposal(tokens: number, costUsd: number) {
@@ -126,6 +129,7 @@ function validateLimits(limits: OptimizerLimits) {
     "maxEvaluatedRuns",
     "maxConcurrentRuns",
     "maxProposalTokens",
+    "maxTokensPerProposal",
     "maxEvaluatedAgentTokens",
     "maxTokensPerEvaluatedRun",
     "maxReservedTokensPerEvaluatedRun",
