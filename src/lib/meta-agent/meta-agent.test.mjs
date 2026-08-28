@@ -424,18 +424,24 @@ test("proposal generator binds only the default host fetch", async () => {
 
   let injectedCalledWithoutReceiver = false;
   let proposalInstructions = "";
+  let proposalRequestBody;
   const injectedGenerator = new OpenRouterProposalGenerator({
     apiKey: "test-only-key",
     modelId: "fake/proposer",
     fetchImpl: function (_url, init) {
       injectedCalledWithoutReceiver = this === undefined;
       const body = JSON.parse(init.body);
+      proposalRequestBody = body;
       proposalInstructions = body.messages[0].content;
       return Promise.resolve(response);
     },
   });
   await injectedGenerator.generate(request);
   assert.equal(injectedCalledWithoutReceiver, true);
+  assert.equal(proposalRequestBody.model, "fake/proposer");
+  assert.deepEqual(proposalRequestBody.reasoning, { effort: "low" });
+  assert.equal(proposalRequestBody.max_tokens, request.maxTokens);
+  assert.equal("include_reasoning" in proposalRequestBody, false);
   const redInstructions = proposalInstructions;
   assert.ok(proposalInstructions.includes("Do not include budgetUsage"));
   for (const category of MUTATION_CATEGORIES_BY_MODE["red-team"]) {

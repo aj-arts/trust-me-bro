@@ -36,6 +36,7 @@ export class OpenRouterProposalGenerator implements ProposalGenerator {
         model: this.modelId,
         temperature: 0.2,
         max_tokens: request.maxTokens,
+        reasoning: { effort: "low" },
         messages: [
           {
             role: "system",

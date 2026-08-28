@@ -55,6 +55,8 @@ one repeat, sequential execution, 4,096 proposal tokens, 16,000 evaluated-agent 
 and a $0.10 estimated-spend ceiling. The proposal allowance leaves room for
 reasoning-capable models to return the required strict JSON object. Increase these values
 only when intentionally opting into more iterations or repeated runs.
+Proposal requests use OpenRouter's normalized `reasoning: { effort: "low" }` parameter so
+mandatory-reasoning models retain reasoning without starving the bounded JSON response.
 
 Proposal schema version 1 accepts legacy model-supplied `budgetUsage` for compatibility,
 but does not trust it. The validator derives canonical operation count, unique files
