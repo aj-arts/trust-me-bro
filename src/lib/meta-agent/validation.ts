@@ -158,7 +158,11 @@ export function validateAndApplyProposal(input: {
     estimatedEditDistance: editDistance,
   };
   if (issues.length > 0) {
-    throw new ProposalValidationError("Proposal violates optimizer safety constraints.", issues);
+    throw new ProposalValidationError(
+      "Proposal violates optimizer safety constraints.",
+      issues,
+      { ...proposal, budgetUsage: actualBudget },
+    );
   }
   return {
     proposal: { ...proposal, budgetUsage: actualBudget },

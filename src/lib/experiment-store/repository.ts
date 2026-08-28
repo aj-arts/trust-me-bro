@@ -3,6 +3,7 @@ import { api } from "../../../convex/_generated/api.js";
 import type { ScenarioSnapshot } from "../browser-runner/scenarioSnapshot.ts";
 import type { RunArtifact, ScenarioRunResult } from "../browser-runner/types.ts";
 import type { SystemPromptMode } from "../../scenarios/system-prompts.ts";
+import type { ProposalValidationIssue } from "../meta-agent/types.ts";
 import {
   chunkArtifact,
   assertNoPersistedSecrets,
@@ -53,6 +54,7 @@ export type CandidateRecord = {
   proposalJson?: string;
   proposalTokens?: number;
   proposalCostUsd?: number;
+  validationIssuesJson?: string;
   createdAt: number;
   decidedAt?: number;
 };
@@ -184,6 +186,20 @@ export interface ExperimentRepository {
     proposalTokens?: number;
     proposalCostUsd?: number;
   }): Promise<void>;
+  createRejectedCandidate(input: {
+    candidateId: string;
+    experimentId: string;
+    parentCandidateId?: string;
+    scenarioRevisionId: string;
+    promptRevisionId: string;
+    mutationKind: "scenario" | "prompt";
+    rationale?: string;
+    generatedBy?: string;
+    proposalJson: string;
+    proposalTokens: number;
+    proposalCostUsd: number;
+    validationIssues: ProposalValidationIssue[];
+  }): Promise<void>;
   decideCandidate(candidateId: string, decision: "accepted" | "rejected"): Promise<void>;
   listExperimentHistory(limit?: number): Promise<ExperimentRecord[]>;
   loadExperiment(experimentId: string): Promise<ExperimentDetail>;
@@ -285,7 +301,28 @@ export class ConvexExperimentRepository implements ExperimentRepository {
     for (const value of [input.rationale, input.generatedBy, input.proposalJson]) {
       if (value) assertNoPersistedSecrets(value);
     }
+
     await this.client.mutation(api.experiments.createCandidate, input);
+  }
+
+  async createRejectedCandidate(
+    input: Parameters<ExperimentRepository["createRejectedCandidate"]>[0],
+  ) {
+    const validationIssuesJson = JSON.stringify(input.validationIssues);
+    for (const value of [
+      input.rationale,
+      input.generatedBy,
+      input.proposalJson,
+      validationIssuesJson,
+    ]) {
+      if (value) assertNoPersistedSecrets(value);
+    }
+    const { validationIssues: _validationIssues, ...candidate } = input;
+    void _validationIssues;
+    await this.client.mutation(api.experiments.createRejectedCandidate, {
+      ...candidate,
+      validationIssuesJson,
+    });
   }
 
   async decideCandidate(candidateId: string, decision: "accepted" | "rejected") {

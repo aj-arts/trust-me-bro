@@ -120,11 +120,17 @@ export type ProposalValidationIssue = {
 
 export class ProposalValidationError extends Error {
   readonly issues: ProposalValidationIssue[];
+  readonly proposal?: StructuredProposal;
 
-  constructor(message: string, issues: ProposalValidationIssue[]) {
+  constructor(
+    message: string,
+    issues: ProposalValidationIssue[],
+    proposal?: StructuredProposal,
+  ) {
     super(message);
     this.name = "ProposalValidationError";
     this.issues = issues;
+    this.proposal = proposal;
   }
 }
 
@@ -151,6 +157,18 @@ export const DEFAULT_PROPOSAL_LIMITS: ProposalLimits = {
   maxEditDistance: 4_000,
   maxEditRatio: 0.4,
 };
+
+export const DEFAULT_BLUE_PROPOSAL_LIMITS: ProposalLimits = {
+  ...DEFAULT_PROPOSAL_LIMITS,
+  maxEditRatio: 1,
+};
+
+export function proposalLimitsForMode(
+  mode: OptimizationMode,
+  configured?: ProposalLimits,
+) {
+  return configured ?? (mode === "blue-team" ? DEFAULT_BLUE_PROPOSAL_LIMITS : DEFAULT_PROPOSAL_LIMITS);
+}
 
 export type ProposalRequest = {
   mode: OptimizationMode;

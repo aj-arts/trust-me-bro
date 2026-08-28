@@ -288,6 +288,87 @@ export const createCandidate = mutation({
   },
 });
 
+export const createRejectedCandidate = mutation({
+  args: {
+    candidateId: v.string(),
+    experimentId: v.string(),
+    parentCandidateId: v.optional(v.string()),
+    scenarioRevisionId: v.string(),
+    promptRevisionId: v.string(),
+    mutationKind: v.union(v.literal("scenario"), v.literal("prompt")),
+    rationale: v.optional(v.string()),
+    generatedBy: v.optional(v.string()),
+    proposalJson: v.string(),
+    proposalTokens: v.number(),
+    proposalCostUsd: v.number(),
+    validationIssuesJson: v.string(),
+  },
+  handler: async (ctx, args) => {
+    assertMetaAgentLabAccess();
+    if (
+      !args.candidateId.trim() ||
+      args.proposalJson.length > 64 * 1024 ||
+      args.validationIssuesJson.length > 32 * 1024 ||
+      !Number.isInteger(args.proposalTokens) ||
+      args.proposalTokens < 0 ||
+      !Number.isFinite(args.proposalCostUsd) ||
+      args.proposalCostUsd < 0
+    ) {
+      throw new ConvexError("Rejected candidate metadata is invalid.");
+    }
+    rejectSecrets(
+      args.rationale,
+      args.generatedBy,
+      args.proposalJson,
+      args.validationIssuesJson,
+    );
+    const issues: unknown = JSON.parse(args.validationIssuesJson);
+    if (!Array.isArray(issues) || issues.length === 0 || issues.length > 100) {
+      throw new ConvexError("Rejected candidate requires bounded validation issues.");
+    }
+    const existing = await ctx.db
+      .query("candidates")
+      .withIndex("by_candidate_id", (q) => q.eq("candidateId", args.candidateId))
+      .unique();
+    if (existing) {
+      if (
+        existing.status === "rejected" &&
+        existing.experimentId === args.experimentId &&
+        existing.proposalJson === args.proposalJson &&
+        existing.validationIssuesJson === args.validationIssuesJson
+      ) {
+        return existing._id;
+      }
+      throw new ConvexError(`Candidate ${args.candidateId} already exists with different metadata.`);
+    }
+    const experiment = await requireExperiment(ctx.db, args.experimentId);
+    if (experiment.status !== "running") {
+      throw new ConvexError("Rejected candidates require a running experiment.");
+    }
+    const parent = args.parentCandidateId
+      ? await requireCandidate(ctx.db, args.parentCandidateId)
+      : undefined;
+    if (parent && parent.experimentId !== args.experimentId) {
+      throw new ConvexError("Candidate parent belongs to another experiment.");
+    }
+    const baseScenario = parent?.scenarioRevisionId ?? experiment.scenarioRevisionId;
+    const basePrompt = parent?.promptRevisionId ?? experiment.promptRevisionId;
+    if (
+      args.scenarioRevisionId !== baseScenario ||
+      args.promptRevisionId !== basePrompt
+    ) {
+      throw new ConvexError("Rejected candidate must retain its parent revisions.");
+    }
+    return await ctx.db.insert("candidates", {
+      schemaVersion: 1,
+      ...args,
+      status: "rejected",
+      createdAt: Date.now(),
+      decidedAt: Date.now(),
+    });
+  },
+});
+
 export const decideCandidate = mutation({
   args: {
     candidateId: v.string(),

@@ -95,7 +95,10 @@ errors. Red-team and blue-team operations cannot cross mutation surfaces. Before
 candidate run, validation enforces operation, file, byte, and edit-distance bounds;
 normalizes relative POSIX virtual paths; rejects traversal, absolute/home/host paths;
 keeps canaries and evaluators immutable; and permits only existing trusted runtime
-fixture identifiers.
+fixture identifiers. Red-team scenario edits retain a 40% subtlety ratio; blue-team
+prompt hardening permits up to a 100% edit ratio while retaining the absolute
+4,000-character and 32 KiB prompt bounds. Immutable trusted seed fixture paths are
+grandfathered, but generated paths remain strict.
 
 Custom lab scenarios are declarative data: virtual files, a task, deterministic
 evaluators, canaries, and an allow-listed runtime fixture. They have no executable code
@@ -107,6 +110,9 @@ The controller persists revisions, candidates, runs, and decisions through
 and run IDs plus idempotent persistence mutations allow a running experiment to resume
 from already completed steps. Budget checks reserve the next proposal/run before
 starting it, cancellation is observed between browser calls, and failures are explicit.
+Structurally valid proposals that fail mutation limits are persisted as rejected
+candidates with validation issues and are never executed; infrastructure and state
+failures remain experiment failures.
 
 OpenRouter keys are constructor-only, in-memory dependencies of the proposal and
 evaluated-agent adapters. They are absent from controller configuration, repository

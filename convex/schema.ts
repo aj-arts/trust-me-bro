@@ -86,6 +86,7 @@ export default defineSchema({
     proposalJson: v.optional(v.string()),
     proposalTokens: v.optional(v.number()),
     proposalCostUsd: v.optional(v.number()),
+    validationIssuesJson: v.optional(v.string()),
     createdAt: v.number(),
     decidedAt: v.optional(v.number()),
   })

@@ -9,8 +9,8 @@ import { OptimizerBudget } from "./budget.ts";
 import { parseStructuredProposal } from "./proposal.ts";
 import { aggregateScores, compareAggregates, scoreArtifact } from "./scoring.ts";
 import {
-  DEFAULT_PROPOSAL_LIMITS,
   ProposalValidationError,
+  proposalLimitsForMode,
   type AggregateScore,
   type EvaluatedAgent,
   type OptimizerConfiguration,
@@ -60,10 +60,14 @@ export async function createOptimizerExperiment(input: {
 export async function runOptimizer(input: OptimizerControllerInput): Promise<OptimizerProgress> {
   const { repository, configuration } = input;
   new OptimizerBudget(configuration.limits);
+  const proposalLimits = proposalLimitsForMode(
+    configuration.mode,
+    configuration.proposalLimits,
+  );
   let detail = await repository.loadExperiment(configuration.experimentId);
   assertCompleteHistory(detail);
   assertExperimentSeed(detail, input);
-  const configurationJson = stableStringify(configuration);
+  const configurationJson = stableStringify({ ...configuration, proposalLimits });
   await repository.bindOptimizerConfiguration(configuration.experimentId, configurationJson);
   detail = await repository.loadExperiment(configuration.experimentId);
   assertCompleteHistory(detail);
@@ -148,12 +152,23 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       configuration.limits.maxIterations,
       configuration.limits.maxCandidates,
     );
+    let lastDecision: "accepted" | "rejected" | undefined;
     for (let iteration = 0; iteration < iterationLimit; iteration += 1) {
       abortIfRequested(input.signal);
       detail = await repository.loadExperiment(configuration.experimentId);
       assertCompleteHistory(detail);
       const candidateId = stableCandidateId(configuration.experimentId, iteration);
       const existing = detail.candidates.find((candidate) => candidate.candidateId === candidateId);
+      if (existing?.validationIssuesJson) {
+        const validationIssues = parseValidationIssues(existing.validationIssuesJson);
+        emit("deciding", iteration + 1, "Candidate rejected by mutation safety validation.", {
+          candidateId,
+          validationIssues,
+          decision: "rejected",
+        });
+        lastDecision = "rejected";
+        continue;
+      }
       let proposal: StructuredProposal;
       let mutated: ReturnType<typeof validateAndApplyProposal>;
       if (existing) {
@@ -163,7 +178,7 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
           scenario: seed.scenario,
           prompt: seed.prompt,
           promptRevisionId: seed.promptRevisionId,
-          limits: configuration.proposalLimits,
+          limits: proposalLimits,
         });
         proposal = mutated.proposal;
       } else {
@@ -185,18 +200,52 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
           scenario: seed.scenario,
           prompt: seed.prompt,
           promptRevisionId: seed.promptRevisionId,
-          limits: configuration.proposalLimits ?? DEFAULT_PROPOSAL_LIMITS,
+          limits: proposalLimits,
           maxTokens: budget.proposalTokenAllowance(),
           signal: input.signal,
         });
         budget.consumeProposal(response.outputTokens, response.costUsd);
-        mutated = validateAndApplyProposal({
-          proposal: parseStructuredProposal(response.output),
-          scenario: seed.scenario,
-          prompt: seed.prompt,
-          promptRevisionId: seed.promptRevisionId,
-          limits: configuration.proposalLimits,
-        });
+        const draft = parseStructuredProposal(response.output);
+        try {
+          mutated = validateAndApplyProposal({
+            proposal: draft,
+            scenario: seed.scenario,
+            prompt: seed.prompt,
+            promptRevisionId: seed.promptRevisionId,
+            limits: proposalLimits,
+          });
+        } catch (error) {
+          if (!(error instanceof ProposalValidationError) || !error.proposal) throw error;
+          const parentCandidateId = detail.candidates
+            .filter((candidate) => candidate.status === "accepted")
+            .at(-1)?.candidateId;
+          await repository.createRejectedCandidate({
+            candidateId,
+            experimentId: configuration.experimentId,
+            parentCandidateId,
+            scenarioRevisionId: seed.scenario.revisionId,
+            promptRevisionId: seed.promptRevisionId,
+            mutationKind: configuration.mode === "red-team" ? "scenario" : "prompt",
+            rationale: error.proposal.rationale,
+            generatedBy: input.proposer.modelId,
+            proposalJson: JSON.stringify(error.proposal),
+            proposalTokens: response.outputTokens,
+            proposalCostUsd: response.costUsd,
+            validationIssues: error.issues,
+          });
+          await repository.completeProposalAttempt(
+            configuration.experimentId,
+            proposalAttemptId,
+          );
+          emit("deciding", iteration + 1, "Candidate rejected by mutation safety validation.", {
+            candidateId,
+            proposal: error.proposal,
+            validationIssues: error.issues,
+            decision: "rejected",
+          });
+          lastDecision = "rejected";
+          continue;
+        }
         proposal = mutated.proposal;
         emit("validating", iteration + 1, "Validated proposal and derived canonical mutation metrics.", {
           candidateId,
@@ -264,7 +313,7 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       const candidate = aggregate(
         candidateArtifacts,
         configuration.mode,
-        subtlety(mutated.editDistance, configuration.proposalLimits?.maxEditDistance ?? DEFAULT_PROPOSAL_LIMITS.maxEditDistance),
+        subtlety(mutated.editDistance, proposalLimits.maxEditDistance),
       );
       emit("evaluating", iteration + 1, "Comparing paired aggregate scores.", {
         candidateId,
@@ -273,6 +322,7 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
         candidate,
       });
       const decision = compareAggregates(candidate, baseline, candidateId) > 0 ? "accepted" : "rejected";
+      lastDecision = decision;
       const persistedCandidate = detail.candidates.find((entry) => entry.candidateId === candidateId);
       if (persistedCandidate?.status === "proposed") {
         await repository.decideCandidate(candidateId, decision);
@@ -300,7 +350,10 @@ export async function runOptimizer(input: OptimizerControllerInput): Promise<Opt
       }
     }
     await repository.completeExperiment(configuration.experimentId);
-    return emit("completed", iterationLimit, "Optimization budget completed.", { baseline });
+    return emit("completed", iterationLimit, "Optimization budget completed.", {
+      baseline,
+      decision: lastDecision,
+    });
   } catch (error) {
     if (error instanceof OptimizerLeaseConflictError) {
       return emit("waiting", detail.candidates.length, error.message);
@@ -576,5 +629,24 @@ function formatError(error: unknown) {
   if (error instanceof ProposalValidationError) {
     return error.issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n").slice(0, 4000);
   }
+
   return (error instanceof Error ? error.message : String(error)).slice(0, 4000);
+}
+
+function parseValidationIssues(value: string) {
+  const parsed: unknown = JSON.parse(value);
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every(
+      (issue) =>
+        typeof issue === "object" &&
+        issue !== null &&
+        typeof issue.path === "string" &&
+        typeof issue.code === "string" &&
+        typeof issue.message === "string",
+    )
+  ) {
+    throw new Error("Persisted candidate validation issues are invalid.");
+  }
+  return parsed as ProposalValidationError["issues"];
 }
