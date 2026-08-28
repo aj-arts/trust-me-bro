@@ -3,6 +3,7 @@ import type { Model } from "@earendil-works/pi-ai";
 export type OpenRouterSessionConfig = {
   apiKey: string;
   model: string;
+  maxTokens?: number;
 };
 
 export type OpenRouterSession = {
@@ -17,15 +18,18 @@ export function createOpenRouterSession(config: OpenRouterSessionConfig): OpenRo
   }
 
   return {
-    model: createOpenRouterModel(config.model),
+    model: createOpenRouterModel(config.model, config.maxTokens),
     modelId: config.model,
     getApiKey: (provider) => (provider === "openrouter" ? config.apiKey : undefined),
   };
 }
 
-export function createOpenRouterModel(id: string): Model<"openai-completions"> {
+export function createOpenRouterModel(id: string, maxTokens = 4096): Model<"openai-completions"> {
   if (!id.trim()) {
     throw new Error("OpenRouter model is required.");
+  }
+  if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 32_768) {
+    throw new Error("OpenRouter maximum output tokens must be an integer from 1 to 32768.");
   }
 
   return {
@@ -39,6 +43,6 @@ export function createOpenRouterModel(id: string): Model<"openai-completions"> {
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128000,
-    maxTokens: 4096,
+    maxTokens,
   };
 }

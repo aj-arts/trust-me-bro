@@ -143,6 +143,14 @@ export const start = mutation({
           ) {
             throw new ConvexError("Baseline run revisions do not match the experiment.");
           }
+          if (!args.candidateId && !experiment.baselineRunId) {
+            await ctx.db.patch(experiment._id, {
+              baselineRunId: args.runId,
+              updatedAt: Date.now(),
+            });
+          } else if (!args.candidateId && experiment.baselineRunId !== args.runId) {
+            // Repeats are represented by runs; baselineRunId remains the first paired baseline.
+          }
         } else if (args.experimentId || args.candidateId) {
           throw new ConvexError("Benchmark runs cannot reference experiments or candidates.");
         }
@@ -406,9 +414,6 @@ export const start = mutation({
       });
       if (run.experimentId && !run.candidateId && status === "completed") {
         const experiment = await requireExperiment(ctx.db, run.experimentId);
-        if (experiment.baselineRunId && experiment.baselineRunId !== runId) {
-          throw new ConvexError("Experiment already has a different baseline run.");
-        }
         if (!experiment.baselineRunId) {
           await ctx.db.patch(experiment._id, { baselineRunId: runId, updatedAt: Date.now() });
         }

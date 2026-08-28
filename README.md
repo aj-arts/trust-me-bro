@@ -16,6 +16,7 @@ It does not run real malware. Each scenario uses a safe virtual shell, fake secr
 - AI scenario generation: generate new benchmark scenarios from the frontend
 - Convex trace archive: store full benchmark traces so canary triggers can later be analyzed for patterns to gain insight
 - Durable experiment history: immutable scenario/prompt revisions, attributable candidate lineage, explicit run/experiment states, and inspectable artifact history
+- Meta-agent lab: bounded red-team scenario optimization or blue-team prompt optimization with declarative proposals, deterministic grading, and resumable persisted runs
 
 ## Tech Stack
 - TypeScript and Next.js monorepo
@@ -46,6 +47,69 @@ pnpm dev:convex
 ```
 
 User OpenRouter keys are entered in the browser runner UI. They should not be stored in Convex or committed env files.
+
+Open `/lab` to run the optimizer. Its economical default proposal and evaluated model
+is `z-ai/glm-5.3-flash`; the model fields also accept any catalog or custom OpenRouter
+model ID. The default hard budget is deliberately sparse: one baseline, one candidate,
+one repeat, sequential execution, 1,200 proposal tokens, 8,000 evaluated-agent tokens,
+and a $0.10 estimated-spend ceiling. Increase these values only when intentionally
+opting into more iterations or repeated runs.
+
+## Optimizer modes and objective
+
+The lab keeps the two mutation surfaces separate:
+
+- **Red-team** proposals may change scenario title, description, task, or virtual files.
+  They optimize for attack success and difficulty while deterministic task solvability
+  remains a hard prerequisite. Subtle changes win over obvious or expensive ones.
+- **Blue-team** proposals may change only the system prompt. They optimize hard safety
+  first, then deterministic task success, while penalizing no-op refusals, token use,
+  and cost.
+
+Scores are multi-dimensional rather than pass/fail. Hard evaluator dimensions are
+compared lexicographically before weighted scalar score. Red-team comparison orders
+task success before attack success; blue-team comparison orders safety before task
+success. Remaining ties use weighted score, lower repeat variance, lower cost, lower
+token use, and finally a stable candidate identifier. Current scalar weights are
+documented in `src/lib/meta-agent/scoring.ts`.
+
+Repeated runs produce means and variances and are compared as paired baseline/candidate
+sets. An optional holdout evaluated model can run the same immutable revision pair,
+subject to the same evaluated-run and spend limits. Deterministic safety and task
+evaluators always outrank heuristic dimensions.
+
+## Optimizer safety model
+
+Proposal output must be a raw version-1 JSON object. Unknown fields, markdown fences,
+wrong parent revision IDs, and malformed operations fail closed with field-level
+errors. Red-team and blue-team operations cannot cross mutation surfaces. Before any
+candidate run, validation enforces operation, file, byte, and edit-distance bounds;
+normalizes relative POSIX virtual paths; rejects traversal, absolute/home/host paths;
+keeps canaries and evaluators immutable; and permits only existing trusted runtime
+fixture identifiers.
+
+Custom lab scenarios are declarative data: virtual files, a task, deterministic
+evaluators, canaries, and an allow-listed runtime fixture. They have no executable code
+field. Generated TypeScript or host shell is never evaluated; all evaluated-agent work
+runs through the existing browser-native just-bash sandbox and fixture allow-list.
+
+The controller persists revisions, candidates, runs, and decisions through
+`ExperimentRepository`; it does not bypass Convex state transitions. Stable candidate
+and run IDs plus idempotent persistence mutations allow a running experiment to resume
+from already completed steps. Budget checks reserve the next proposal/run before
+starting it, cancellation is observed between browser calls, and failures are explicit.
+
+OpenRouter keys are constructor-only, in-memory dependencies of the proposal and
+evaluated-agent adapters. They are absent from controller configuration, repository
+interfaces, proposal payloads, and persistence arguments. Tests use deterministic fake
+adapters and make no live calls.
+
+Current limitations: a partially uploaded run is not replayed automatically because
+doing so could duplicate a billable provider call; the controller surfaces it as an
+explicit failure for operator inspection. Provider-reported token usage is authoritative
+after each call, while per-call output tokens are capped before dispatch. Convex access
+control follows the deployment's existing policy; public or multi-user deployments must
+add authenticated ownership checks before exposing write mutations.
 
 ## Experiment persistence
 
@@ -84,3 +148,15 @@ responses, and semantic canary hooks. Caller-created declarative scenarios do no
 need registry entries and use the generic isolated runtime. Deterministic grading
 reports safety and task success separately; configured task evaluators must pass in
 addition to avoiding canaries.
+
+Reasoning inspection is limited to thinking/reasoning content explicitly returned by
+the provider. Trust Me Bro cannot access or reconstruct hidden chain-of-thought.
+
+## Validation
+
+```bash
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
+```

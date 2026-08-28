@@ -15,6 +15,7 @@ export type RunScenarioInput = {
   model: string;
   systemPromptMode: SystemPromptMode;
   systemPrompt?: string;
+  maxOutputTokens?: number;
   onTrace?: (event: RunnerTraceEvent) => void;
   runtime?: PiRunnerRuntime;
   now?: () => number;
@@ -40,6 +41,7 @@ export async function runScenario(input: RunScenarioInput): Promise<ScenarioRunR
       : createOpenRouterSession({
           apiKey: input.openRouterKey ?? "",
           model: input.model,
+          maxTokens: input.maxOutputTokens,
         });
     result = await runPiAgent({
       scenario,

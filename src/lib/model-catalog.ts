@@ -21,6 +21,7 @@ export const dashboardModels: ModelCatalogEntry[] = [
 ];
 
 const featuredRunnerModels: ModelCatalogEntry[] = [
+  { id: "z-ai/glm-5.3-flash", name: "GLM 5.3 Flash", vendor: "Z.AI" },
   { id: "openai/gpt-5.6-sol", name: "GPT-5.6 Sol", vendor: "OpenAI" },
   { id: "x-ai/grok-4.5", name: "Grok 4.5", vendor: "xAI" },
   { id: "anthropic/claude-opus-4.8", name: "Claude Opus 4.8", vendor: "Anthropic" },
