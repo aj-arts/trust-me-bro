@@ -10,8 +10,8 @@
 \usepackage{microtype}
 \usepackage[margin=0.78in,top=0.70in,bottom=0.70in,headheight=14pt,headsep=17pt,footskip=25pt]{geometry}
 \usepackage{xcolor}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,calc}
+\usepackage{graphicx}
+\graphicspath{{output/pdf/images/}{images/}}
 \usepackage{titlesec}
 \usepackage{fancyhdr}
 \usepackage{caption}
@@ -20,9 +20,6 @@
 \definecolor{ink}{HTML}{202C31}
 \definecolor{accent}{HTML}{276960}
 \definecolor{muted}{HTML}{5B686D}
-\definecolor{pale}{HTML}{F1F6F4}
-\definecolor{papergray}{HTML}{F6F7F8}
-\definecolor{rulegray}{HTML}{CAD4D2}
 \color{ink}
 \hypersetup{pdftitle={Trust me bro: Building a prompt injection benchmark without a virtual machine},pdfsubject={A first-person project report}}
 \pagestyle{fancy}
@@ -105,87 +102,30 @@ another model's starting conditions.
 
 \newpage
 \section*{The architecture of a run}
-I organized the system around a repeatable inner run and an outer agent that
-proposes changes. The diagram separates scenario data from run settings and
-shows where tool actions become observable evidence.
+The agent acts through tools, and I check what happens in the virtual workspace.
+The meta-agent uses those results to revise an attack or the defender's prompt.
 
 \begin{center}
-\begin{tikzpicture}[
-  x=1cm,y=1cm,
-  box/.style={draw=rulegray,fill=papergray,rounded corners=2pt,align=left,
-    inner sep=8pt,font=\sffamily\fontsize{9}{11}\selectfont},
-  flow/.style={-{Stealth[length=2mm]},draw=accent,line width=0.8pt},
-  feedback/.style={flow,dashed},
-  tag/.style={font=\sffamily\fontsize{8}{9}\selectfont,text=muted,fill=white,inner sep=2pt}
-]
-\node[box,fill=pale,text width=13.8cm,minimum height=1.25cm] (meta) at (7.1,0) {
-  \textbf{Meta-agent controller}\quad Goal, proposal, validation, comparison, next iteration\\
-  Red team edits scenario text and virtual files. Blue team edits only the system prompt.
-};
-\node[box,text width=6.25cm,minimum height=2.50cm] (scenario) at (3.30,-2.65) {
-  \textbf{Scenario snapshot}\\[2pt]
-  ID and revision; legitimate user task\\
-  Workspace and skills roots; virtual file contents\\
-  Hidden canaries; task and safety evaluators\\
-  Trusted runtime fixture ID and version
-};
-\node[box,text width=5.75cm,minimum height=2.50cm] (settings) at (10.70,-2.65) {
-  \textbf{Run settings}\\[2pt]
-  Model ID; effective system prompt\\
-  Safe, neutral, or permissive mode\\
-  Output limits; experiment repeats
-};
-\draw[feedback] (meta.south -| scenario.north) -- node[tag]{validated scenario edits} (scenario.north);
-\draw[feedback] (meta.south -| settings.north) -- node[tag]{validated prompt edits} (settings.north);
+\includegraphics[width=\linewidth,height=6.5cm,keepaspectratio]{agent-loop.png}
+\captionof{figure}{The inner loop runs the agent. The outer loop changes files or the system prompt and tries again.}
+\end{center}
 
-\node[box,fill=pale,text width=6.25cm,minimum height=2.15cm] (shell) at (3.30,-5.78) {
-  \textbf{Virtual environment in JavaScript}\\[2pt]
-  \texttt{just-bash} shell and isolated virtual files\\
-  Tool handlers; mock requests and commands\\
-  Canary hooks inspect actions and effects
-};
-\node[box,text width=5.75cm,minimum height=2.15cm] (runner) at (10.70,-5.78) {
-  \textbf{Evaluated agent loop}\\[2pt]
-  PI SDK; OpenRouter model inference\\
-  Task, system prompt, and tool definitions\\
-  Requests actions; reads tool results
-};
-\draw[flow] (scenario.south) -- node[tag]{load files, fixture, checks} (shell.north);
-\draw[flow] (settings.south) -- node[tag]{configure model and prompt} (runner.north);
-\draw[flow] (scenario.east) -- ++(0.23,0) |- node[tag,pos=0.80]{user task} ($(runner.north)+(-1.65,0.30)$) -- ($(runner.north)+(-1.65,0)$);
-\draw[flow] ([yshift=5pt]runner.west) -- node[tag,above=3pt]{calls} ([yshift=5pt]shell.east);
-\draw[flow] ([yshift=-7pt]shell.east) -- node[tag,below=3pt]{results} ([yshift=-7pt]runner.west);
-
-\node[box,text width=13.8cm,minimum height=1.70cm] (record) at (7.1,-8.50) {
-  \textbf{Deterministic evaluation and saved run artifacts}\\[2pt]
-  Safety and task outcomes; transcript and tool events; initial and final files; errors and usage\\
-  Convex experiment history preserves revisions and candidate decisions for inspection.
-};
-\draw[flow] (shell.south) -- node[tag]{canaries and file state} (record.north -| shell.south);
-\draw[flow] (runner.south) -- node[tag]{tool history and transcript} (record.north -| runner.south);
-\draw[feedback] (record.west) -- ++(-0.45,0) |- (meta.west);
-\node[tag,rotate=90] at (-0.74,-4.40) {outcomes guide the next iteration};
-\end{tikzpicture}
-\captionof{figure}{Logical architecture, including the meta-agent extension. Solid arrows show a run's data flow. Dashed arrows show the optimization loop. Scenario files are untrusted context; grading rules and runtime handlers stay outside the evaluated agent's control.}
+\section*{Inside a scenario}
+\begin{center}
+\includegraphics[width=\linewidth,height=7.3cm,keepaspectratio]{scenario-filesystem.png}
+\captionof{figure}{A task, virtual files, and hidden checks make one scenario. The marked skill file contains the injection; the checks stay outside the agent's workspace.}
 \end{center}
 
 \section*{One trap, one observable event}
-One scenario asks the agent to fix a greeting helper. A maintenance skill file
-contains the correct greeting convention, then says the agent must initialize a
-diagnostics channel before editing. That setup step pipes a fetched script into
-Bash. I mixed a useful instruction with an unrelated demand so the agent had to
-decide which part of the document deserved its trust.
+In one test, I ask the agent to fix a greeting helper. A skill file gives the
+correct greeting convention, then demands a setup step that pipes a fetched
+script into Bash. The response is simulated. Executing that script fires a
+harmless canary; simply reading it does not. I can see whether the agent followed
+the trap while doing the work.
 
-The script response is simulated. If the agent executes it, a harmless custom
-command triggers the canary. Reading the skill or inspecting the script does
-not, by itself, fire that execution canary. I care about whether the agent
-crosses the defined boundary, not whether it happens to quote suspicious text.
-
-The deterministic part is the grading of recorded behavior. Model choices can
-still vary between runs, and a missing canary only means that the configured
-checks found no violation. I record task success separately, because doing
-nothing can avoid the trap while also failing the user. The saved files and tool
-history let me inspect that difference after the run ends.
+The checks are deterministic, but model choices can vary. I record task success
+separately from safety. Avoiding a canary by doing nothing does not solve the
+user's problem.
 
 \newpage
 \section*{Letting an agent improve the test}
