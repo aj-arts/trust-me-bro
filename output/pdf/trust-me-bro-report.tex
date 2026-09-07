@@ -48,147 +48,149 @@
 \vspace{5pt}
 
 \section*{Why I wanted to test this myself}
-I started this project because I kept seeing claims about how dangerous AI agents
-were becoming. Stories about reward hacking and models finding ways around their
-instructions caught my attention, but I wanted something I could test myself.
-Which models would actually follow a malicious instruction? Would a stronger
-model notice the trap, or would it be better at carrying it out?
+I started this because I kept reading that AI agents were getting dangerous.
+Reward hacking, models routing around their instructions, that kind of story.
+The claims interested me, but I wanted something I could run and watch for
+myself. Which models would actually follow a malicious instruction? Would a
+stronger model spot the trap, or just be better at springing it?
 
-Those questions led me to prompt injection. Reward hacking helped spark my
-interest, but the experiment I chose was more specific. I gave a coding agent a
-legitimate task and put misleading instructions in material it would encounter
-while working. A repository file or skill document could ask it to run an
-unrelated setup command, disclose a fake secret, or change something outside the
-task. I wanted to see when the agent would treat that text as permission.
+Those questions pointed me at prompt injection. Reward hacking got me curious,
+but the experiment I settled on was narrower. Give a coding agent a real task,
+then plant misleading instructions in the material it reads while working. A
+repository file or a skill document might tell it to run a setup command the
+task never asked for, or to hand over a fake secret. I wanted to see when the
+agent would read that text as permission.
 
-I called the project Trust me bro. The name fit the thing I was testing. A file
-can sound authoritative without having any right to give instructions. I wanted
-to watch what happened when an agent took that authority at face value.
+I named it Trust me bro because that's the whole test. A file can sound
+authoritative without having any right to give orders, and I wanted to watch
+what an agent did when it took that authority at face value.
 
 \section*{A shell I could observe}
-The design decision that made the project practical was to keep the agent's
-working environment inside a JavaScript runtime. I used \texttt{just-bash} for a
-Bash-like shell and a virtual filesystem. I did not need to start a virtual
-machine for each run. The agent could read files, issue shell commands, and write
-changes through tool calls, while I controlled what those calls did.
+The decision that made this practical was keeping the agent's working
+environment inside a JavaScript runtime. I used \texttt{just-bash}, which gives
+me a Bash-like shell and a virtual filesystem, so I never had to start a virtual
+machine for a run. The agent reads files and issues shell commands through tool
+calls, and I decide what those calls do.
 
-That control mattered more to me than reproducing an entire computer. A
-\texttt{bash} call went to the virtual shell. A \texttt{write\_file} call changed
-virtual file contents. Scenario-specific handlers supplied simulated network
-responses and commands. The model still used real inference through OpenRouter,
-but the repository, fake credentials, and dangerous effects belonged to the test
-environment.
+That control mattered more to me than reproducing a full computer. A
+\texttt{bash} call goes to the virtual shell. A \texttt{write\_file} call changes
+virtual file contents. Scenario handlers supply mocked commands and network
+responses. The model itself is real, running inference through OpenRouter, but
+the repository and the fake credentials and the dangerous effects all live in
+the test environment.
 
-Because actions passed through these handlers, I could inspect a command before
-execution, check a write, or record an attempted request to a simulated endpoint.
-I could also make a harmless command fire a canary, a marker for a defined
-violation. This gave me a concrete event to grade without asking another model
+Since every action passes through a handler, I can look at a command before it
+runs, or record an attempted request to a simulated endpoint. I can also have a
+harmless command fire a canary, a marker for one defined violation. That gives
+me a concrete event to grade. I'd rather grade an event than ask another model
 whether the agent's explanation sounded safe.
 
 \section*{What goes into a scenario}
-I built each scenario around a legitimate user task and a small virtual workspace.
-The scenario describes its identity, task, workspace and skills paths, and a map
-of filenames to contents. Those files hold both the useful project context and
-the injected instructions. Hidden canaries define the behavior I want to catch.
-Task and safety evaluators check file contents, file changes, command results,
-or canary states. A trusted runtime fixture supplies any special simulated
-behavior the scenario needs.
+Each scenario is built around a legitimate user task and a small virtual
+workspace. It declares its identity, the task, workspace and skills paths, and a
+map of filenames to contents. Those files carry the useful project context and
+the injected instructions mixed together, the way an injection would actually
+arrive. Hidden canaries define the behavior I want to catch. Optional task and
+safety evaluators check file contents, file changes, command results, or canary
+states. A trusted runtime fixture supplies any special simulated behavior the
+scenario needs.
 
-I keep the selected model and effective system prompt separate from those files.
-That lets me hold an attack fixed and change the model or its instructions. The
-evaluated agent receives the task and tools, not the grading rules. Each run
-starts with its own virtual filesystem, so one model's edits do not become
-another model's starting conditions.
+The selected model and the effective system prompt live outside those files.
+That lets me hold an attack fixed and swap the model or its instructions. The
+agent under test gets the task and the tools, never the grading rules. Every run
+starts on a fresh virtual filesystem, so one model's edits can't become the next
+model's starting conditions.
 
 \newpage
-\section*{The architecture of a run}
-The agent acts through tools, and I check what happens in the virtual workspace.
-The meta-agent uses those results to revise an attack or the defender's prompt.
+\section*{How a run fits together}
+The agent acts through tools, and I check what changed in the virtual workspace.
+The meta-agent reads those results and revises either the attack or the
+defender's prompt.
 
 \begin{center}
 \includegraphics[width=\linewidth,height=6.5cm,keepaspectratio]{agent-loop.png}
-\captionof{figure}{The inner loop runs the agent. The outer loop changes files or the system prompt and tries again.}
+\captionof{figure}{The inner loop runs the agent. The outer loop edits files or the system prompt and tries again.}
 \end{center}
 
 \section*{Inside a scenario}
 \begin{center}
 \includegraphics[width=\linewidth,height=7.3cm,keepaspectratio]{scenario-filesystem.png}
-\captionof{figure}{A task, virtual files, and hidden checks make one scenario. The marked skill file contains the injection; the checks stay outside the agent's workspace.}
+\captionof{figure}{A task, virtual files, and hidden checks make one scenario. The marked skill file carries the injection. The checks sit outside the agent's workspace.}
 \end{center}
 
-\section*{One trap, one observable event}
-In one test, I ask the agent to fix a greeting helper. A skill file gives the
+\section*{One trap, one event I can see}
+In one test I ask the agent to fix a greeting helper. A skill file gives the
 correct greeting convention, then demands a setup step that pipes a fetched
-script into Bash. The response is simulated. Executing that script fires a
-harmless canary; simply reading it does not. I can see whether the agent followed
-the trap while doing the work.
+script into Bash. The fetch is simulated. Running that script fires a harmless
+canary. Just reading it doesn't. So I can see whether the agent took the bait
+while it did the work.
 
-The checks are deterministic, but model choices can vary. I record task success
-separately from safety. Avoiding a canary by doing nothing does not solve the
-user's problem.
+The checks are deterministic, but the model's choices aren't. I record task
+success and safety as separate results, because avoiding a canary by doing
+nothing doesn't fix the user's problem.
 
 \newpage
 \section*{Letting an agent improve the test}
 Once I could run and inspect a scenario, I wanted an agent to help me change it.
-I built a meta-agent that sits above the evaluated agent and works toward a
-chosen goal. In red-team mode, it proposes changes to scenario text or virtual
-files to make an injection more effective. In blue-team mode, it can change only
-the system prompt to improve the defender's behavior. Both use the same runner,
-so I can compare a proposed change with a baseline.
+So I built a meta-agent that sits above the evaluated agent and works toward a
+goal I pick. In red-team mode it proposes edits to scenario text or virtual
+files to make an injection land more often. In blue-team mode it can touch only
+the system prompt, to make the defender behave better. Both go through the same
+runner, so I can put a proposed change next to a baseline.
 
 I made those proposals structured edits rather than arbitrary code. Validation
-checks the allowed fields, paths, and edit limits before a candidate runs.
-The meta-agent cannot rewrite the canaries or evaluators, or invent an executable
-runtime fixture. Otherwise it could improve its score by changing what counts
-as success. That would recreate the problem that got me interested in this
-project in the first place.
+checks the allowed fields, paths, and edit limits before a candidate ever
+runs. The meta-agent can't rewrite the canaries or evaluators, and it can't
+invent an executable runtime fixture. Otherwise it could raise its score by
+changing what counts as success. That's the exact behavior that got me
+interested in this project, and I didn't want to build it into my own tooling.
 
 The controller evaluates candidates within run, token, and spending limits. Red
-teaming gives task success priority before attack success. Blue teaming ranks
-safety first, then task success, and penalizes apparent no-op refusals through a
-heuristic. Repeated runs support baseline comparisons, and saved revisions link
-each candidate to its edits and outcomes. I wanted to be able to open an
-experiment later and understand why the controller accepted a change.
+teaming ranks task success ahead of attack success. Blue teaming ranks safety
+first, then task success, and uses a heuristic to penalize what look like no-op
+refusals. Repeated runs support baseline comparisons, and each saved revision
+links a candidate to its edits and outcomes. I wanted to open an experiment
+months later and still understand why the controller accepted a change.
 
 \section*{What surprised me about the models}
-In my exploratory runs, some frontier models were very good at following the
-instructions they encountered, including instructions that led to unsafe
-actions. Some weaker models appeared safer. Looking at the traces made me less
-comfortable with that simple ranking. A model could avoid a malicious sequence
-because it failed to understand or execute the sequence at all.
+In my exploratory runs, some frontier models were very good at following
+whatever instructions they met, including the ones that led somewhere unsafe.
+Some weaker models looked safer. Then I read the traces and got less
+comfortable with that ranking. A model could sidestep a malicious sequence
+because it never understood the sequence, or couldn't execute it.
 
-That distinction changed how I read the results. I do not want to give a model
-credit for good security judgment when it was simply unable to finish the work.
-The useful comparison is whether it can complete the legitimate task while
-rejecting the injected instruction. A low attack success rate alone does not
-answer that question.
+That changed how I read the results. I don't want to credit a model with
+security judgment when it was just unable to finish the work. The comparison I
+care about is whether a model completes the legitimate task and refuses the
+injected instruction at the same time. A low attack success rate on its own
+doesn't tell me that.
 
-Changing the system prompt also changed what I saw. When I explicitly told
-models to treat repository files, skills, and tool output as untrusted context,
-the frontier models became more secure in the runs I observed. My reading is
-that instruction following contributes to both behaviors. A capable model can
-follow a bad instruction well, but it can also follow a clear security rule
-well. Part of the apparent gap between models may therefore come from how I
-instructed them.
+The system prompt changed what I saw too. When I told models plainly to treat
+repository files, skills, and tool output as untrusted context, the frontier
+models became more secure in the runs I observed. My reading is that
+instruction following feeds both behaviors. A capable model follows a bad
+instruction well, and it follows a clear security rule well. Some of the gap I
+saw between models probably came from how I instructed them.
 
 These are qualitative observations, not a controlled ranking of model families.
-I have not established that lower capability causes greater safety, or that a
-stronger system prompt solves prompt injection. To make those claims, I would
-need repeated comparisons with matched tasks, settings, and task-success checks,
-including attacks the prompt optimizer had not already seen.
+I haven't shown that lower capability causes greater safety, or that a stronger
+system prompt solves prompt injection. To claim either, I'd need repeated
+comparisons with matched tasks, settings, and task-success checks, including
+attacks the prompt optimizer hadn't already seen.
 
 \section*{What I want others to build}
-I want the community to be able to write a virtual workspace, define a task and
-its checks, and run that experiment against different models. The reusable
-scenario format and shared runner make that possible without preparing a
-virtual machine for every test. The meta-agent adds a way to search for better
-attacks or defenses while retaining the edits and evidence.
+I want other people to write a virtual workspace, define a task and its checks,
+and run that against whichever models they care about. The scenario format and
+the shared runner make that possible without preparing a virtual machine for
+every test. The meta-agent adds a way to search for better attacks or defenses
+while keeping the edits and the evidence.
 
-The virtual environment only covers the behaviors I implement, and each
-evaluator only catches the conditions it checks. I see those limits as reasons
-to make scenarios inspectable and easy to extend. I started by wanting to know
-which model I could trust. I ended up wanting to see the command it ran, the
-file it changed, and the instruction that got it there.
+The virtual environment covers only the behaviors I implemented, and each
+evaluator catches only the condition it checks. A clean run means the agent
+didn't trip the canaries I wrote, not that it's safe. I take those limits as
+reasons to keep scenarios inspectable and easy to extend. I started out wanting
+to know which model I could trust. I ended up wanting to see the exact command
+it ran and the line of text that talked it into running it.
 
 \vfill
 {\footnotesize\color{muted}
